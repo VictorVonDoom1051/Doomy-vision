@@ -3,13 +3,41 @@
 Ningún bloqueo detuvo la misión completa: cada uno se documenta aquí y el trabajo
 continuó en cualquier otra parte independiente, tal como se pidió.
 
-_Actualizado en Mission 002: los BLOCKERS 1-4 (Mission 001) siguen vigentes sin cambios —
-ninguno se resolvió esta sesión, se re-confirman abajo. Se agrega BLOCKER 5, específico de
-Mission 002._
+_Actualizado en Mission 003: los BLOCKERS 1-5 siguen vigentes, algunos re-confirmados.
+Se agrega BLOCKER 6, específico de Mission 003._
 
 ---
 
-## BLOCKER 5 (Mission 002) — Sin credenciales reales de proveedor en este entorno
+## BLOCKER 6 (Mission 003) — Victor debe proporcionar 4 credenciales de proveedores
+
+**IMPACT**: Alto para pasar de IMPLEMENTED NOT VERIFIED a REAL VERIFIED en Anthropic/Groq/ElevenLabs. Ningún impacto en infraestructura de Railway, deployment, o testing estructural.
+
+**EVIDENCE**: Railway está listo con 27 variables configuradas. Las 4 variables de credenciales existen pero están vacías:
+- ANTHROPIC_API_KEY (vacío)
+- GROQ_API_KEY (vacío)
+- ELEVENLABS_API_KEY (vacío)
+- ELEVENLABS_VOICE_ID (vacío)
+
+Sin estos valores, el backend arranca correctamente (MOCK_MODE protege, healthcheck PASS) pero los proveedores reales no pueden llamarse en PASO 6-7.
+
+**WHAT USER NEEDS TO DO**: Victor debe:
+1. Obtener claves:
+   - **Anthropic**: Login en console.anthropic.com → Settings → API Keys → copiar clave
+   - **Groq**: Login en console.groq.com → API Keys → copiar clave
+   - **ElevenLabs**: Login en elevenlabs.io → API settings → copiar clave
+   - **ElevenLabs**: elevenlabs.io → Voice Lab → copiar ID (probablemente "VVD")
+2. Agregar a Railway:
+   - Vía dashboard: Project `doomy-vision` → Service `doomy-vision` → Variables tab → 4 nuevas
+   - O comunicar a Claude para que las configure vía Railway MCP (requiere autorización)
+3. Railroad automáticamente re-deployará el servicio con las nuevas variables
+
+**WHAT CLAUDE CONTINUED WORKING ON**: Todo lo demás de Mission 003 sin esperar — documentación de deployment, checklists de pruebas, preparación de código. Las pruebas reales (PASO 6-7) simplemente no pueden ejecutarse hasta que Victor proporcione credenciales.
+
+**Timeline**: Bloqueador no degrada trabajo — railway.toml, tests, checklists, documentación = TODO listo. Transición a REAL VERIFIED ocurrirá en PASO 6 de Mission 004 (pruebas), tan pronto como Victor proporcione credenciales.
+
+---
+
+## BLOCKER 5 (Mission 002) — Sin credenciales reales de proveedor en este entorno (CARRY-OVER)
 
 **IMPACT**: Alto para poder marcar Anthropic/Groq/ElevenLabs como "REAL VERIFIED" en vez
 de "IMPLEMENTED NOT VERIFIED". Cero impacto en el resto del trabajo — todo el pipeline,

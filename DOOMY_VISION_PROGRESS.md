@@ -1,13 +1,53 @@
 # Doomy Vision — Progress
 
-_Actualizado durante la sesión, no solo al final. Este documento cubre dos misiones:
-Mission 001 (construcción inicial) y Mission 002 (endurecimiento + pipeline real), en ese
-orden cronológico. Mission 002 se agrega arriba porque es el estado más reciente; la
-sección Mission 001 se conserva abajo sin editar como historial._
+_Actualizado durante la sesión, no solo al final. Este documento cubre tres misiones:
+Mission 001 (construcción inicial), Mission 002 (endurecimiento + pipeline real), y Mission 003 (Railway deploy).
+Mission 003 se agrega arriba porque es el estado más reciente; versiones anteriores se conservan abajo como historial._
 
 ---
 
-## MISSION 002 — Estado actual (el más reciente)
+## MISSION 003 — Estado actual (el más reciente)
+
+### COMPLETED
+
+- **PASO 1 — Auditoría Previa**: 60/60 tests PASS (instalación limpia confirmada), backend arranca en NODE_ENV=production, healthchecks verificados, MOCK_MODE protegido, railway.toml validado
+- **PASO 2 — Railway Infrastructure**: Proyecto `doomy-vision` creado, servicio `doomy-vision` creado, 27/31 variables configuradas (4 pendientes = credenciales de Victor)
+- **PASO 3 — Código y Deploy**: Commit 464f78d, código listo para push, railway.toml con Nixpacks, startCommand y healthcheckPath correctos
+- **PASO 4-8 — Pruebas Documentadas**: Checklists completos para HTTPS, texto, visión, pipeline completo, y teléfono real (simple y técnico)
+- **Aislamiento verificado**: Nuevo proyecto dedicado, CERO modificaciones a otros servicios (`doomy-assistant`, `doomy-whatsapp-production`, etc.)
+- **Documentación**: 5 documentos nuevos (SETUP, DEPLOY_STEPS, VICTOR_CHECKLIST, TEST_CHECKLIST, MOBILE_CHECKLIST) + este reporte
+
+### Hallazgos Críticos
+
+| Aspecto | Estado |
+|---|---|
+| Backend Tests | 60/60 PASS ✓ |
+| Production Start | ✓ PASS |
+| Healthchecks | ✓ PASS |
+| Railway Service | ✓ CREATED |
+| Variables (27) | ✓ CONFIGURED |
+| Code Ready | ✓ COMMITTED |
+| **Overall** | **READY FOR DEPLOYMENT** |
+
+### Blockers (Mission 003-specific)
+
+**BLOCKER 6**: Victor debe proporcionar 4 credenciales (ANTHROPIC_API_KEY, GROQ_API_KEY, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID)
+- **Impact**: Alto para pasar a REAL VERIFIED
+- **Action**: Victor copia claves de console.anthropic.com, console.groq.com, elevenlabs.io
+- **Resolution**: Agregar a Railway vía dashboard o pasar a Claude para config automática
+- **Progress**: Bloqueado, NO impide resto del trabajo
+
+### NEXT (Mission 003)
+
+1. **Victor**: Proporcionar 4 credenciales → Agregar a Railway
+2. **Victor**: Conectar repositorio GitHub o autorizar a Claude para hacerlo
+3. **Deployment**: Railway detecta cambios, inicia build → deploy automático
+4. **Pruebas** (PASO 4-8): Ejecutar checklists cuando deployment esté PASS
+5. **Reporte**: Mission 004 — Documentar resultados de pruebas
+
+---
+
+## MISSION 002 — Estado histórico (Mission 002)
 
 ### COMPLETED
 
