@@ -670,26 +670,66 @@
     if (state.pendingImageBlob) return; // ya hay una imagen adjunta manualmente
     if (!state.webcamStream) return; // solo si el permiso de cámara YA fue otorgado antes — nunca pide uno nuevo a mitad de un envío
     if (!AUTO_CAPTURE_TRIGGERS.some((re) => re.test(text))) return;
+
     const video = $('webcamPreview');
     const canvas = $('snapCanvas');
-    // Usar dimensiones del video o fallback si aún no están listas
-    let width = video.videoWidth || 640;
-    let height = video.videoHeight || 480;
 
-    // Si el video aún no tiene dimensiones pero está playing, esperar un tick
-    if (!video.videoWidth && video.readyState >= 2) {
-      setTimeout(() => maybeAutoCapture(text), 50);
+    // Verificar que el video está completamente listo
+    if (!video || !canvas) {
+      log('Auto-captura: elemento video o canvas no encontrado', 'err-line');
       return;
     }
 
-    canvas.width = width; canvas.height = height;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    const bytes = atob(dataUrl.split(',')[1]);
-    const arr = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-    state.pendingImageBlob = new Blob([arr], { type: 'image/jpeg' });
-    log('Auto-captura: frame de cámara web adjuntado (pregunta detectada como visual).', 'ok-line');
+    // Si el video está en state HAVE_CURRENT_DATA (3) o HAVE_FUTURE_DATA (4), está listo
+    // readyState >= 2 es HAVE_CURRENT_DATA
+    if (video.readyState < 2) {
+      // Video aún no tiene datos, esperar un tick
+      if (video.readyState > 0) { // HAVE_METADATA al menos
+        setTimeout(() => maybeAutoCapture(text), 50);
+      }
+      return;
+    }
+
+    try {
+      // Usar dimensiones del video o fallback si aún no están listas
+      let width = video.videoWidth || 640;
+      let height = video.videoHeight || 480;
+
+      // Fallback si aún no hay dimensiones pero video está playing
+      if (width <= 0 || height <= 0) {
+        width = 640;
+        height = 480;
+        if (video.readyState >= 2) {
+          setTimeout(() => maybeAutoCapture(text), 50);
+          return;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        log('Auto-captura: no se pudo obtener contexto 2D del canvas', 'err-line');
+        return;
+      }
+
+      ctx.drawImage(video, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      if (!dataUrl || dataUrl.length < 100) {
+        log('Auto-captura: canvas vacío o inválido', 'err-line');
+        return;
+      }
+
+      const bytes = atob(dataUrl.split(',')[1]);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      state.pendingImageBlob = new Blob([arr], { type: 'image/jpeg' });
+      log('Auto-captura: frame de cámara web adjuntado (' + width + 'x' + height + ', ' + state.pendingImageBlob.size + ' bytes).', 'ok-line');
+    } catch (err) {
+      log('Auto-captura ERROR: ' + (err?.message || String(err)), 'err-line');
+    }
   }
 
   async function sendTurn() {
