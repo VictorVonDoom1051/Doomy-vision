@@ -70,6 +70,31 @@ export class SessionStore {
     session.lastActivityAt = Date.now();
   }
 
+  /**
+   * Devuelve la sesión viva más reciente de un dispositivo, o crea una nueva
+   * (Mission 004, para `/ask`). Un Atajo de iOS no puede guardar estado entre
+   * invocaciones de forma cómoda: manda solo su `device_id` y el backend le
+   * mantiene la continuidad de la conversación ("¿qué es esto?" -> "¿tiene
+   * PoE?") sin que el cliente tenga que administrar `session_id`.
+   *
+   * Las sesiones expiradas se ignoran aquí igual que en `get()` — nunca se
+   * revive una sesión pasada de TTL, se crea una nueva y limpia.
+   */
+  findOrCreateByDevice({ deviceId, deviceType = 'rayban_meta', mode = 'real' }) {
+    const now = Date.now();
+    let newest = null;
+    for (const session of this.sessions.values()) {
+      if (session.deviceId !== deviceId) continue;
+      if (now - session.lastActivityAt > this.ttlMs) continue;
+      if (!newest || session.lastActivityAt > newest.lastActivityAt) newest = session;
+    }
+    if (newest) {
+      this.touch(newest);
+      return { session: newest, created: false };
+    }
+    return { session: this.create({ deviceId, deviceType, mode }), created: true };
+  }
+
   addTurn(session, { role, text, visionUsed = false }) {
     session.history.push({ role, text, timestamp: Date.now(), visionUsed });
     if (session.history.length > this.maxHistoryTurns) {

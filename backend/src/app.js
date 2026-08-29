@@ -14,6 +14,7 @@ import { healthRouter } from './routes/health.js';
 import { deviceRouter } from './routes/device.js';
 import { sessionRouter } from './routes/session.js';
 import { conversationRouter } from './routes/conversation.js';
+import { askRouter } from './routes/ask.js';
 import { visionRouter } from './routes/vision.js';
 import { audioRouter } from './routes/audio.js';
 import { diagnosticsRouter } from './routes/diagnostics.js';
@@ -114,6 +115,9 @@ export function createApp() {
   app.use(V1, generalLimiter, conversationRouter);
   app.use(V1, visionAudioLimiter, visionRouter);
   app.use(V1, visionAudioLimiter, audioRouter);
+  // `/ask` acepta imagen adjunta como `/vision`, así que comparte el límite
+  // más estricto en vez del general de texto.
+  app.use(V1, visionAudioLimiter, askRouter);
 
   // Web Simulator / Developer Console (sección 22) — herramienta interna.
   app.use('/doomy-vision/dev', express.static(path.join(__dirname, '..', '..', 'simulator')));
