@@ -500,25 +500,19 @@
         state.webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = state.webcamStream;
         video.style.display = 'block';
-        $('btnWebcam').textContent = '📸 Capturar frame';
-        log('Cámara web activa.', 'ok-line');
+        $('btnWebcam').textContent = '🎥 Detener cámara';
+        log('Cámara web activa. Ahora puedes escribir "¿Qué estoy viendo?" para auto-capturar.', 'ok-line');
       } catch (err) {
         log('No se pudo acceder a la cámara: ' + err.message, 'err-line');
       }
       return;
     }
-    const canvas = $('snapCanvas');
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    canvas.toBlob((blob) => {
-      state.pendingImageBlob = blob;
-      renderPreviewChip('image', blob);
-      log('Frame capturado desde cámara web.', 'ok-line');
-    }, 'image/jpeg', 0.85);
+    // Si hay stream, detener (segundo clic)
     state.webcamStream.getTracks().forEach((t) => t.stop());
     state.webcamStream = null;
     video.style.display = 'none';
     $('btnWebcam').textContent = '🎥 Cámara web (frame)';
+    log('Cámara web detenida.', 'ok-line');
   });
 
   // ---------- Push-to-talk mic (Fase 7-10: PTT real, robusto en móvil) ----------
