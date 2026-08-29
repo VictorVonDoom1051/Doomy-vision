@@ -2,8 +2,9 @@ FROM node:22-slim
 
 WORKDIR /app
 
-# Copy backend code
+# Copy backend code and simulator
 COPY backend/ ./backend/
+COPY simulator/ ./simulator/
 
 # Install dependencies
 WORKDIR /app/backend
