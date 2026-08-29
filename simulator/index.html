@@ -672,8 +672,17 @@
     if (!AUTO_CAPTURE_TRIGGERS.some((re) => re.test(text))) return;
     const video = $('webcamPreview');
     const canvas = $('snapCanvas');
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-    if (!canvas.width || !canvas.height) return;
+    // Usar dimensiones del video o fallback si aún no están listas
+    let width = video.videoWidth || 640;
+    let height = video.videoHeight || 480;
+
+    // Si el video aún no tiene dimensiones pero está playing, esperar un tick
+    if (!video.videoWidth && video.readyState >= 2) {
+      setTimeout(() => maybeAutoCapture(text), 50);
+      return;
+    }
+
+    canvas.width = width; canvas.height = height;
     canvas.getContext('2d').drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     const bytes = atob(dataUrl.split(',')[1]);
