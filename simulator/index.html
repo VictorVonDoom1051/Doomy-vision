@@ -665,10 +665,15 @@
   // si vale la pena adjuntar el frame ya disponible de la cámara web antes
   // de mandar el turno, cuando el usuario activó el toggle explícitamente.
   const AUTO_CAPTURE_TRIGGERS = [/qu[eé] (estoy|es lo que estoy) viendo/i, /qu[eé] es esto/i, /puedes ver/i, /mira esto/i, /ve(s)? esto/i];
-  function maybeAutoCapture(text) {
+  const AUTO_CAPTURE_MAX_RETRIES = 20; // Max 20 retries × 50ms = 1000ms
+
+  function maybeAutoCapture(text, retries = 0) {
     if (!$('autoCaptureToggle').checked) return;
     if (state.pendingImageBlob) return; // ya hay una imagen adjunta manualmente
-    if (!state.webcamStream) return; // solo si el permiso de cámara YA fue otorgado antes — nunca pide uno nuevo a mitad de un envío
+    if (!state.webcamStream) {
+      log('Auto-captura: no hay stream de cámara (permiso no otorgado).', 'err-line');
+      return; // solo si el permiso de cámara YA fue otorgado antes — nunca pide uno nuevo a mitad de un envío
+    }
     if (!AUTO_CAPTURE_TRIGGERS.some((re) => re.test(text))) return;
 
     const video = $('webcamPreview');
@@ -680,28 +685,35 @@
       return;
     }
 
+    log(`Auto-captura [attempt ${retries + 1}/${AUTO_CAPTURE_MAX_RETRIES}]: readyState=${video.readyState}, dims=${video.videoWidth}x${video.videoHeight}`);
+
     // Si el video está en state HAVE_CURRENT_DATA (3) o HAVE_FUTURE_DATA (4), está listo
     // readyState >= 2 es HAVE_CURRENT_DATA
     if (video.readyState < 2) {
       // Video aún no tiene datos, esperar un tick
-      if (video.readyState > 0) { // HAVE_METADATA al menos
-        setTimeout(() => maybeAutoCapture(text), 50);
+      if (video.readyState > 0 && retries < AUTO_CAPTURE_MAX_RETRIES) { // HAVE_METADATA al menos
+        setTimeout(() => maybeAutoCapture(text, retries + 1), 50);
+      } else {
+        log('Auto-captura: readyState nunca llegó a 2 (timeout)', 'err-line');
       }
       return;
     }
 
     try {
       // Usar dimensiones del video o fallback si aún no están listas
-      let width = video.videoWidth || 640;
-      let height = video.videoHeight || 480;
+      let width = video.videoWidth || 0;
+      let height = video.videoHeight || 0;
 
       // Fallback si aún no hay dimensiones pero video está playing
       if (width <= 0 || height <= 0) {
-        width = 640;
-        height = 480;
-        if (video.readyState >= 2) {
-          setTimeout(() => maybeAutoCapture(text), 50);
+        if (retries < AUTO_CAPTURE_MAX_RETRIES) {
+          log(`Auto-captura [attempt ${retries + 1}]: esperando dimensiones... (readyState=${video.readyState})`);
+          setTimeout(() => maybeAutoCapture(text, retries + 1), 50);
           return;
+        } else {
+          log('Auto-captura: dimensiones nunca se establecieron (timeout), usando fallback 640x480', 'warn-line');
+          width = 640;
+          height = 480;
         }
       }
 
@@ -718,7 +730,7 @@
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
       if (!dataUrl || dataUrl.length < 100) {
-        log('Auto-captura: canvas vacío o inválido', 'err-line');
+        log('Auto-captura: canvas vacío o inválido (dataUrl.length=' + (dataUrl?.length || 0) + ')', 'err-line');
         return;
       }
 
@@ -726,9 +738,9 @@
       const arr = new Uint8Array(bytes.length);
       for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
       state.pendingImageBlob = new Blob([arr], { type: 'image/jpeg' });
-      log('Auto-captura: frame de cámara web adjuntado (' + width + 'x' + height + ', ' + state.pendingImageBlob.size + ' bytes).', 'ok-line');
+      log('Auto-captura: frame de cámara web adjuntado (' + width + 'x' + height + ', ' + state.pendingImageBlob.size + ' bytes). [attempt ' + (retries + 1) + ']', 'ok-line');
     } catch (err) {
-      log('Auto-captura ERROR: ' + (err?.message || String(err)), 'err-line');
+      log('Auto-captura ERROR [attempt ' + (retries + 1) + ']: ' + (err?.message || String(err)), 'err-line');
     }
   }
 
