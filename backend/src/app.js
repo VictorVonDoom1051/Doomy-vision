@@ -80,6 +80,13 @@ export function createApp() {
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   app.use(cors(corsOptions()));
   app.use(express.json({ limit: '1mb' }));
+  // Mission 004: los Atajos de iOS mandan un body "Form" como
+  // `application/x-www-form-urlencoded` cuando no lleva archivo adjunto
+  // (solo cambian a multipart si hay imagen). Sin este parser, `req.body`
+  // llegaba vacío y una pregunta de solo texto desde el Atajo fallaba con
+  // "No se recibió texto ni audio transcribible". Encontrado probando
+  // `/ask` real contra producción, no en teoría.
+  app.use(express.urlencoded({ extended: false, limit: '1mb' }));
   app.use(
     pinoHttp({
       logger,

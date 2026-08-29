@@ -132,4 +132,20 @@ describe('POST /ask — forma de la respuesta', () => {
     const res = await request(app).post(`${V1}/ask`).set('x-doomy-vision-key', KEY()).send({});
     expect(res.status).toBe(400);
   });
+
+  // Bug real encontrado probando /ask contra producción: los Atajos de iOS
+  // mandan `application/x-www-form-urlencoded` cuando el body es "Form" sin
+  // archivo adjunto. Sin `express.urlencoded`, req.body llegaba vacío y una
+  // pregunta de solo texto desde el Atajo devolvía 400.
+  it('acepta un body form-urlencoded (el que manda un Atajo sin imagen)', async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post(`${V1}/ask`)
+      .set('x-doomy-vision-key', KEY())
+      .type('form')
+      .send({ text: '¿Qué hora es?', device_id: `test-form-${Date.now()}` });
+
+    expect(res.status).toBe(200);
+    expect(res.body.text).toBeTruthy();
+  });
 });
