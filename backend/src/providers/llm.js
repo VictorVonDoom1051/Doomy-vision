@@ -33,13 +33,21 @@ export class AnthropicLLMProvider {
       { role: 'user', content },
     ];
 
-    const resp = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-      ...(tools.length ? { tools } : {}),
-    });
+    // max_tokens configurable (Fase 20, protección de costo) y timeout
+    // explícito por request (Fase 21) — este era el único proveedor sin
+    // timeout propio; stt.js/tts.js ya usan AbortSignal.timeout() en su
+    // fetch crudo. El SDK de Anthropic acepta un timeout por-request (ms)
+    // como segundo argumento de options, sin afectar el body enviado.
+    const resp = await this.client.messages.create(
+      {
+        model: this.model,
+        max_tokens: config.limits.maxResponseTokens,
+        system: systemPrompt,
+        messages,
+        ...(tools.length ? { tools } : {}),
+      },
+      { timeout: config.limits.requestTimeoutMs }
+    );
 
     const textBlocks = resp.content.filter((b) => b.type === 'text').map((b) => b.text);
     const toolCalls = resp.content

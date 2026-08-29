@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import { makeApp, registerDevice, V1_PREFIX as V1 } from './helpers.js';
+import { makeApp, registerDevice, V1_PREFIX as V1, TINY_JPEG_BASE64 } from './helpers.js';
 
 describe('device registration & auth', () => {
   it('rejects registration with wrong internal key', async () => {
@@ -84,5 +84,32 @@ describe('session lifecycle', () => {
     const reset = await request(app).post(`${V1}/session/${sessionId}/reset`).set('authorization', `Bearer ${token}`).send({});
     expect(reset.status).toBe(200);
     expect(reset.body.turns).toBe(0);
+  });
+
+  it('un reset limpia también la imagen activa y su resumen — no debe filtrar contexto viejo (bug real corregido)', async () => {
+    const app = makeApp();
+    const token = await registerDevice(app);
+    const create = await request(app).post(`${V1}/session`).set('authorization', `Bearer ${token}`).send({ mode: 'mock' });
+    const sessionId = create.body.session_id;
+
+    const withImage = await request(app)
+      .post(`${V1}/conversation`)
+      .set('authorization', `Bearer ${token}`)
+      .field('session_id', sessionId)
+      .field('text', '¿qué estoy viendo?')
+      .attach('image', Buffer.from(TINY_JPEG_BASE64, 'base64'), { filename: 'a.jpg', contentType: 'image/jpeg' });
+    expect(withImage.body.vision_context_summary).toBeTruthy();
+
+    await request(app).post(`${V1}/session/${sessionId}/reset`).set('authorization', `Bearer ${token}`).send({});
+
+    // Turno de texto puro, sin ninguna relación con la imagen anterior:
+    // no debe arrastrar vision_context_summary ni reusar la imagen vieja.
+    const afterReset = await request(app)
+      .post(`${V1}/conversation`)
+      .set('authorization', `Bearer ${token}`)
+      .send({ session_id: sessionId, text: 'hola de nuevo' });
+
+    expect(afterReset.body.vision_used).toBe(false);
+    expect(afterReset.body.vision_context_summary).toBeNull();
   });
 });

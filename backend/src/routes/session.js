@@ -34,6 +34,14 @@ sessionRouter.post('/session/:id/reset', requireAccessToken, (req, res, next) =>
     session.history = [];
     session.lastImage = null;
     session.turns = 0;
+    // Bug real encontrado y corregido en Mission 002 (Fase 15-24): el reset
+    // no limpiaba `lastImageBuffer` ni `visionContextSummary`, así que un
+    // turno de texto completamente nuevo después de un reset seguía
+    // devolviendo el resumen visual de la imagen de ANTES del reset —
+    // contexto obsoleto filtrándose a través de un reset que se supone
+    // limpia todo. Confirmado con una prueba real que falló primero.
+    session.lastImageBuffer = null;
+    session.visionContextSummary = null;
     res.json(toPublicSession(session));
   } catch (err) {
     next(err);

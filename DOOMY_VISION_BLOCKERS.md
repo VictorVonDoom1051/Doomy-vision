@@ -3,6 +3,49 @@
 Ningún bloqueo detuvo la misión completa: cada uno se documenta aquí y el trabajo
 continuó en cualquier otra parte independiente, tal como se pidió.
 
+_Actualizado en Mission 002: los BLOCKERS 1-4 (Mission 001) siguen vigentes sin cambios —
+ninguno se resolvió esta sesión, se re-confirman abajo. Se agrega BLOCKER 5, específico de
+Mission 002._
+
+---
+
+## BLOCKER 5 (Mission 002) — Sin credenciales reales de proveedor en este entorno
+
+**IMPACT**: Alto para poder marcar Anthropic/Groq/ElevenLabs como "REAL VERIFIED" en vez
+de "IMPLEMENTED NOT VERIFIED". Cero impacto en el resto del trabajo — todo el pipeline,
+la instrumentación, la seguridad, los tests y la documentación se completaron y
+verificaron igual, en `MOCK_MODE`.
+
+**EVIDENCE**: Se intentó leer los valores reales de `ANTHROPIC_API_KEY`, `GROQ_API_KEY`,
+`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` del servicio `doomy-assistant` en Railway vía
+el MCP de Railway conectado a esta sesión (`list-variables`). La respuesta confirma que
+las 51 variables existen (incluidas las cuatro anteriores), pero **`valuesRedacted:
+true`** — esta conexión de Railway (OAuth app, no API token de sesión completa) solo
+expone nombres de variable, nunca valores en texto plano. Esto es el comportamiento de
+seguridad correcto de Railway para conexiones OAuth, no un bug ni un permiso a pedir que
+se cambie. Ver `MISSION_002_BASELINE.md` para el detalle completo de este hallazgo.
+
+**WHAT WAS TRIED**: `list-variables` vía Railway MCP (confirmó existencia, no valores);
+no se intentó ningún otro método para extraer las llaves (correcto — extraerlas sin
+autorización explícita de Victor estaría fuera de la regla de aislamiento y de buenas
+prácticas de seguridad, incluso si técnicamente fuera posible).
+
+**WHAT USER NEEDS TO DO**: Si Victor quiere pasar de IMPLEMENTED NOT VERIFIED a REAL
+VERIFIED para los tres proveedores, puede proveer credenciales de prueba explícitamente
+(idealmente llaves separadas/acotadas, no las de producción de `doomy-assistant`) en una
+sesión futura. Con eso, `npm run smoke` (backend) hace como mucho 1-3 llamadas reales por
+proveedor — nunca un loop, nunca automatizado — y `npm run smoke:pipeline` valida el
+pipeline completo de punta a punta contra un servidor con `MOCK_MODE=false`.
+
+**WHAT CLAUDE CONTINUED WORKING ON**: Todo el resto de Mission 002 en `MOCK_MODE=true` —
+pipeline completo instrumentado, manejo de fallos de proveedor probado con mocks que
+simulan fallos reales (timeout, auth inválida, respuesta malformada), los dos scripts de
+smoke test escritos y verificados en su lógica de gate/ejecución (aunque sin credenciales
+para ejercer las llamadas reales en sí), y el código de los tres providers auditado línea
+por línea contra la documentación oficial vigente de cada proveedor (Anthropic Messages
+API, Groq Whisper, ElevenLabs TTS) para maximizar la probabilidad de que funcionen a la
+primera cuando haya credenciales reales.
+
 ---
 
 ## BLOCKER 1 — Acceso de lectura al repositorio `doomy-assistant`
@@ -123,3 +166,25 @@ reemplazar por fuentes del sistema únicamente (cambio de una línea en
 
 **WHAT CLAUDE CONTINUED WORKING ON**: Se agregó un favicon inline (data URI) que sí
 eliminó el otro error de red detectado (404 de `/favicon.ico`).
+
+---
+
+## Estado de BLOCKERS 1-4 al cierre de Mission 002
+
+Re-confirmados, sin cambios de sustancia — ninguno se resolvió esta sesión porque
+resolverlos requiere una acción de Victor (acceso al repo, aprobación de Meta, un
+entorno con Android Studio/Xcode) fuera del alcance de esta sesión de trabajo:
+
+- **BLOCKER 1** (acceso a `doomy-assistant`): sigue sin acceso. No se necesitó esta
+  sesión — Mission 002 trabajó enteramente dentro de `doomy-vision/` como siempre.
+- **BLOCKER 2** (Meta Wearables Developer Preview): sigue sin aprobación/credenciales de
+  Meta. Cero impacto en el trabajo de Mission 002 (backend, seguridad, tests, docs), que
+  no depende de MWDAT.
+- **BLOCKER 3** (sin Android SDK/Xcode en este entorno): sigue igual. Mission 002 no
+  tocó `bridge-android/app` ni `bridge-ios` más allá de lo ya descrito en
+  `DOOMY_VISION_PROGRESS.md` — el rebuild limpio de `:core` (Kotlin/JVM puro, sí compila
+  aquí) se re-verificó con éxito (26/26) como parte del re-run final de Mission 002.
+- **BLOCKER 4** (Google Fonts en sandbox): sigue igual, cosmético, no bloqueante —
+  reapareció de forma distinta durante el E2E expandido de Mission 002 (un
+  `console.error` sin URL en vez de un `requestfailed`) y se documentó/filtró en el
+  script de test sin necesitar ningún cambio de producto.

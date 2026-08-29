@@ -78,7 +78,7 @@
   }
 
   label{display:block;font-size:12.5px;color:var(--text-dim);margin:0 0 6px;}
-  input[type=text],input[type=url],select,textarea{
+  input[type=text],input[type=url],input[type=password],select,textarea{
     width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
     color:var(--text);padding:9px 10px;font-family:var(--body);font-size:13.5px;
     outline:none;transition:border-color .15s;
@@ -88,6 +88,12 @@
   .field{margin-bottom:12px;}
   .row{display:flex;gap:10px;}
   .row > *{flex:1;}
+  .field-with-toggle{position:relative;}
+  .field-with-toggle input{padding-right:60px;}
+  .field-with-toggle button{
+    position:absolute;right:5px;top:50%;transform:translateY(-50%);
+    padding:4px 8px;font-size:11px;
+  }
 
   button{
     font-family:var(--body);font-weight:600;font-size:13.5px;cursor:pointer;
@@ -121,6 +127,33 @@
   .diag-row span.k{color:var(--text-dim);}
 
   .state-strip{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+
+  /* Máquina de estados visible (Fase 7-10, Mission 002): IDLE / LISTENING /
+     PROCESSING / SPEAKING / ERROR — un único indicador grande, siempre
+     visible, en vez de estados dispersos por sub-componente. */
+  .app-state{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+    border:1px solid var(--border);background:var(--bg);font-family:var(--mono);
+    font-size:12.5px;letter-spacing:.04em;margin-bottom:12px;
+  }
+  .app-state .dot-lg{width:10px;height:10px;border-radius:50%;background:var(--text-faint);flex:none;}
+  .app-state.st-idle .dot-lg{background:var(--text-faint);}
+  .app-state.st-listening .dot-lg{background:var(--err);box-shadow:0 0 10px var(--err);animation:pulse 1s infinite;}
+  .app-state.st-processing .dot-lg{background:var(--warn);box-shadow:0 0 10px var(--warn);animation:pulse 1s infinite;}
+  .app-state.st-speaking .dot-lg{background:var(--accent);box-shadow:0 0 10px var(--accent);animation:pulse 1s infinite;}
+  .app-state.st-error .dot-lg{background:var(--err);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  /* Botón de PTT — objetivo táctil grande, pensado para sostenerse con el
+     pulgar en un teléfono real, no un botón pequeño de fila. */
+  .mic-btn{
+    width:100%;padding:18px 14px;font-size:15px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    -webkit-user-select:none;user-select:none;touch-action:none;
+    border-width:2px;
+  }
+  .mic-btn.recording{background:var(--err-wash);border-color:var(--err);color:#f2a3a3;}
+  .mic-btn .mic-icon{font-size:18px;}
 
   .chat{display:flex;flex-direction:column;gap:12px;min-height:120px;}
   .msg{max-width:78%;padding:11px 13px;border-radius:11px;font-size:14px;line-height:1.5;}
@@ -193,7 +226,10 @@
         </div>
         <div class="field">
           <label for="internalKey">Internal key (Bridge secret, solo dev)</label>
-          <input type="text" id="internalKey" placeholder="DOOMY_VISION_INTERNAL_KEY" />
+          <div class="field-with-toggle">
+            <input type="password" id="internalKey" placeholder="DOOMY_VISION_INTERNAL_KEY" autocomplete="off" />
+            <button type="button" class="ghost small" id="btnToggleKey">mostrar</button>
+          </div>
         </div>
         <div class="field">
           <label for="deviceId">Device ID</label>
@@ -246,19 +282,24 @@
       </div>
 
       <div class="composer">
+        <div class="app-state st-idle" id="appState"><span class="dot-lg"></span><span id="appStateLabel">IDLE</span></div>
+
         <div class="capture-row">
           <button class="small" id="btnAttachImage">📎 Adjuntar imagen</button>
           <button class="small" id="btnWebcam">🎥 Cámara web (frame)</button>
-          <button class="small" id="btnMic">🎙️ Grabar (mantener)</button>
-          <span class="pill" id="micState"><span class="dot"></span>IDLE</span>
+          <label class="pill" style="cursor:pointer;"><input type="checkbox" id="autoCaptureToggle" style="margin-right:5px;" />auto-captura si hace falta visión</label>
         </div>
         <input type="file" id="fileImage" accept="image/*" style="display:none" />
         <video id="webcamPreview" autoplay playsinline muted></video>
         <canvas id="snapCanvas"></canvas>
         <div class="preview-strip" id="previewStrip"></div>
 
-        <div class="send-row">
-          <textarea id="textInput" placeholder="Escribe como si hablaras por los Ray-Ban… (Doomy, ¿qué estoy viendo?)"></textarea>
+        <button class="mic-btn" id="btnMic" type="button">
+          <span class="mic-icon">🎙️</span><span id="micBtnLabel">Mantén presionado para hablar</span>
+        </button>
+
+        <div class="send-row" style="margin-top:12px;">
+          <textarea id="textInput" placeholder="…o escribe como si hablaras por los Ray-Ban (Doomy, ¿qué estoy viendo?)"></textarea>
           <button class="primary" id="btnSend">Enviar</button>
         </div>
       </div>
@@ -281,10 +322,56 @@
     recordedChunks: [],
     stream: null,
     webcamStream: null,
+    isRecording: false,
+    recordTimer: null,
+    recordMaxMs: 30000, // default conservador; se refina con /diagnostics al conectar
+    appState: 'idle',
   };
 
   // Default API base = same origin the console is served from.
   $('apiBase').value = window.location.origin;
+
+  // ---------- Máquina de estados visible (Fase 7-10) ----------
+  // IDLE | LISTENING | PROCESSING | SPEAKING | ERROR — un solo lugar que
+  // decide el estado global, para que nunca queden indicadores
+  // contradictorios (p. ej. "escuchando" y "pensando" a la vez).
+  function setAppState(next, label) {
+    state.appState = next;
+    const el = $('appState');
+    el.className = 'app-state st-' + next;
+    $('appStateLabel').textContent = label || next.toUpperCase();
+    const micBtn = $('btnMic');
+    const sendBtn = $('btnSend');
+    // Durante PROCESSING no se debe poder disparar un segundo turno en
+    // paralelo desde el mismo composer (el backend sí soporta concurrencia
+    // entre sesiones, pero un mismo usuario mandando 2 turnos a la vez
+    // sobre la misma sesión no tiene sentido en la UI de un solo hilo).
+    const busy = next === 'processing';
+    sendBtn.disabled = busy;
+    micBtn.disabled = busy;
+    micBtn.classList.toggle('recording', next === 'listening');
+    if (next === 'error') {
+      setTimeout(() => { if (state.appState === 'error') setAppState('idle'); }, 3500);
+    }
+  }
+
+  // ---------- Mostrar/ocultar internal key (nunca queda visible por defecto) ----------
+  $('btnToggleKey').addEventListener('click', () => {
+    const input = $('internalKey');
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    $('btnToggleKey').textContent = showing ? 'mostrar' : 'ocultar';
+  });
+
+  // ---------- Online/offline (checklist de prueba móvil: reconexión de red) ----------
+  window.addEventListener('offline', () => {
+    setPill('diagNet', 'err', 'OFFLINE');
+    log('Sin conexión de red — reintenta cuando vuelva.', 'err-line');
+  });
+  window.addEventListener('online', () => {
+    log('Conexión de red recuperada.', 'ok-line');
+    refreshDiagnostics();
+  });
 
   function log(msg, cls) {
     const el = $('log');
@@ -384,6 +471,9 @@
       setPill('diagNet', 'ok', 'ONLINE');
       $('diagLatency').textContent = diag.metrics.average_latency_ms != null ? diag.metrics.average_latency_ms + ' ms' : '—';
       $('diagSuccess').textContent = diag.metrics.success_rate != null ? Math.round(diag.metrics.success_rate * 100) + '%' : '—';
+      if (diag.limits?.audio_max_seconds) {
+        state.recordMaxMs = diag.limits.audio_max_seconds * 1000;
+      }
     } catch (err) {
       setPill('diagCore', 'err', 'OFFLINE');
       setPill('diagNet', 'err', 'ERROR');
@@ -431,38 +521,117 @@
     $('btnWebcam').textContent = '🎥 Cámara web (frame)';
   });
 
-  // ---------- Push-to-talk mic ----------
+  // ---------- Push-to-talk mic (Fase 7-10: PTT real, robusto en móvil) ----------
+  // Protecciones exigidas: cancelación de gesto (touchcancel, blur/visibility
+  // change), duración máxima (recordMaxMs, tomado de /diagnostics), permiso
+  // denegado (estado ERROR visible, nunca falla en silencio), y guardas
+  // contra doble-inicio (mousedown + touchstart sintético en el mismo toque).
   const micBtn = $('btnMic');
+
+  function pickMimeType() {
+    // Safari (iOS/macOS) no soporta audio/webm; Chrome/Android sí. Se
+    // detecta explícitamente en vez de asumir un solo formato — el backend
+    // igual valida el MIME real que llegue (validateAudioUpload).
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/mpeg'];
+    for (const c of candidates) {
+      if (window.MediaRecorder?.isTypeSupported?.(c)) return c;
+    }
+    return undefined; // deja que el navegador elija su default
+  }
+
   async function startRecording() {
+    if (state.isRecording) return; // guarda contra doble-inicio (mouse+touch)
+    if (state.appState === 'processing') return; // no grabar mientras se procesa un turno previo
+    state.isRecording = true;
     try {
       state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       state.recordedChunks = [];
-      state.mediaRecorder = new MediaRecorder(state.stream);
+      const mimeType = pickMimeType();
+      state.mediaRecorder = mimeType ? new MediaRecorder(state.stream, { mimeType }) : new MediaRecorder(state.stream);
+      state.recordMimeType = mimeType || 'audio/webm';
       state.mediaRecorder.ondataavailable = (e) => e.data.size && state.recordedChunks.push(e.data);
+      state.mediaRecorder.onerror = (e) => {
+        log('Error del grabador: ' + (e.error?.message || 'desconocido'), 'err-line');
+        cancelRecording();
+      };
       state.mediaRecorder.start();
-      setPill('micState', 'ok', 'LISTENING');
+      $('micBtnLabel').textContent = 'Suelta para enviar…';
+      setAppState('listening', 'LISTENING');
       log('🎙️ Escuchando…');
+
+      // Duración máxima (protección contra "too long recording"): si el
+      // usuario no suelta a tiempo, se corta sola en vez de dejar crecer un
+      // archivo que el backend rechazaría igual por AUDIO_MAX_SECONDS.
+      state.recordTimer = setTimeout(() => {
+        if (state.isRecording) {
+          log('Duración máxima de grabación alcanzada — se envía lo grabado.', 'err-line');
+          stopRecording();
+        }
+      }, state.recordMaxMs);
     } catch (err) {
+      state.isRecording = false;
+      // Fase 7: permiso denegado (u otro fallo de getUserMedia) debe ser un
+      // estado visible, no un fallo silencioso.
+      setAppState('error', 'ERROR: micrófono');
       log('No se pudo acceder al micrófono: ' + err.message, 'err-line');
     }
   }
+
   function stopRecording() {
-    if (!state.mediaRecorder) return;
+    if (!state.isRecording || !state.mediaRecorder) return;
+    state.isRecording = false;
+    clearTimeout(state.recordTimer);
+    $('micBtnLabel').textContent = 'Mantén presionado para hablar';
+    if (state.mediaRecorder.state !== 'recording') { setAppState('idle'); return; }
     state.mediaRecorder.onstop = () => {
-      const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
+      const blob = new Blob(state.recordedChunks, { type: state.recordMimeType });
+      state.stream?.getTracks().forEach((t) => t.stop());
+      if (blob.size === 0) {
+        log('Grabación vacía (0 bytes) — descartada.', 'err-line');
+        setAppState('idle');
+        return;
+      }
       state.pendingAudioBlob = blob;
       renderPreviewChip('audio', blob);
-      setPill('micState', null, 'IDLE');
-      state.stream.getTracks().forEach((t) => t.stop());
+      setAppState('idle');
       log('Grabación lista (' + Math.round(blob.size / 1024) + ' KB).', 'ok-line');
     };
     state.mediaRecorder.stop();
   }
+
+  /** Cancelación de gesto: el usuario perdió el toque (llamada entrante,
+   * gesto del sistema, cambió de app) — se descarta la grabación en vez de
+   * enviar audio parcial/corrupto o dejar el micrófono abierto para siempre. */
+  function cancelRecording() {
+    if (!state.isRecording) return;
+    state.isRecording = false;
+    clearTimeout(state.recordTimer);
+    $('micBtnLabel').textContent = 'Mantén presionado para hablar';
+    try { if (state.mediaRecorder?.state === 'recording') state.mediaRecorder.stop(); } catch { /* noop */ }
+    state.stream?.getTracks().forEach((t) => t.stop());
+    setAppState('idle');
+    log('Grabación cancelada (gesto interrumpido).', 'err-line');
+  }
+
   micBtn.addEventListener('mousedown', startRecording);
   micBtn.addEventListener('mouseup', stopRecording);
-  micBtn.addEventListener('mouseleave', () => { if (state.mediaRecorder?.state === 'recording') stopRecording(); });
-  micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
-  micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+  micBtn.addEventListener('mouseleave', () => { if (state.isRecording) stopRecording(); });
+  micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); }, { passive: false });
+  micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); }, { passive: false });
+  micBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); cancelRecording(); }, { passive: false });
+  // El dedo se movió fuera del botón sin soltar: se trata como cancelación,
+  // no como "seguir grabando a ciegas".
+  micBtn.addEventListener('touchmove', (e) => {
+    if (!state.isRecording) return;
+    const t = e.touches[0];
+    const rect = micBtn.getBoundingClientRect();
+    const inside = t.clientX >= rect.left && t.clientX <= rect.right && t.clientY >= rect.top && t.clientY <= rect.bottom;
+    if (!inside) cancelRecording();
+  }, { passive: true });
+  // Cambio de pestaña/app o pérdida de foco mientras se graba: cancelar en
+  // vez de dejar el micrófono abierto indefinidamente en segundo plano.
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelRecording(); });
+  window.addEventListener('blur', cancelRecording);
 
   function renderPreviewChip(kind, blob) {
     const strip = $('previewStrip');
@@ -490,24 +659,51 @@
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTurn(); }
   });
 
+  // Heurística ligera y honesta para la auto-captura opcional (Fase 7-10):
+  // reutiliza las mismas frases gatillo que el backend (src/intent.js), sin
+  // duplicar lógica de "sabe si de verdad hace falta imagen" — solo decide
+  // si vale la pena adjuntar el frame ya disponible de la cámara web antes
+  // de mandar el turno, cuando el usuario activó el toggle explícitamente.
+  const AUTO_CAPTURE_TRIGGERS = [/qu[eé] (estoy|es lo que estoy) viendo/i, /qu[eé] es esto/i, /puedes ver/i, /mira esto/i, /ve(s)? esto/i];
+  function maybeAutoCapture(text) {
+    if (!$('autoCaptureToggle').checked) return;
+    if (state.pendingImageBlob) return; // ya hay una imagen adjunta manualmente
+    if (!state.webcamStream) return; // solo si el permiso de cámara YA fue otorgado antes — nunca pide uno nuevo a mitad de un envío
+    if (!AUTO_CAPTURE_TRIGGERS.some((re) => re.test(text))) return;
+    const video = $('webcamPreview');
+    const canvas = $('snapCanvas');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    if (!canvas.width || !canvas.height) return;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const bytes = atob(dataUrl.split(',')[1]);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    state.pendingImageBlob = new Blob([arr], { type: 'image/jpeg' });
+    log('Auto-captura: frame de cámara web adjuntado (pregunta detectada como visual).', 'ok-line');
+  }
+
   async function sendTurn() {
     if (!state.sessionId) { log('Crea una sesión primero.', 'err-line'); return; }
+    if (state.appState === 'processing') return; // ya hay un turno en vuelo
     const text = $('textInput').value.trim();
     if (!text && !state.pendingAudioBlob) { log('Escribe algo o graba audio.', 'err-line'); return; }
+
+    maybeAutoCapture(text);
 
     const fd = new FormData();
     fd.append('session_id', state.sessionId);
     if (text) fd.append('text', text);
     if (state.pendingImageBlob) fd.append('image', state.pendingImageBlob, 'frame.jpg');
-    if (state.pendingAudioBlob) fd.append('audio', state.pendingAudioBlob, 'ptt.webm');
+    if (state.pendingAudioBlob) fd.append('audio', state.pendingAudioBlob, 'ptt.' + (state.recordMimeType?.includes('mp4') ? 'm4a' : 'webm'));
 
     appendMsg('user', text || '(audio)', { thumb: state.pendingImageBlob });
     $('textInput').value = '';
-    const imageWasAttached = !!state.pendingImageBlob;
     state.pendingImageBlob = null;
     state.pendingAudioBlob = null;
     $('previewStrip').innerHTML = '';
 
+    setAppState('processing', 'PROCESSING');
     const thinking = appendMsg('assistant', '🧠 Pensando…', {}, true);
     try {
       const res = await apiFetch('/conversation', { method: 'POST', body: fd });
@@ -517,6 +713,7 @@
       appendMsg('assistant', res.text, {
         visionUsed: res.vision_used,
         visionRequested: res.vision_requested,
+        audioUnavailable: res.audio_unavailable,
         transcription: res.transcription,
         latency: res.latency_ms,
         audioUrl,
@@ -524,14 +721,22 @@
       if (res.vision_requested) {
         log('Doomy pidió visión y no había imagen — vuelve a intentar adjuntando una imagen.', 'err-line');
       }
+      if (res.audio_unavailable) {
+        log('TTS no disponible en esta respuesta — se muestra el texto igual (fallback correcto).', 'err-line');
+      }
       $('diagLatency').textContent = (res.latency_ms.total_ms ?? '—') + ' ms';
       log(`Respuesta recibida (${res.latency_ms.total_ms} ms, vision_used=${res.vision_used}).`, 'ok-line');
+      // SPEAKING solo mientras el audio de respuesta realmente suena (ver
+      // los listeners play/ended en appendMsg) — el estado por defecto tras
+      // recibir la respuesta es IDLE, no SPEAKING.
+      setAppState('idle');
       refreshDiagnostics();
     } catch (err) {
       thinking.remove();
       appendMsg('assistant', '⚠️ ' + err.message, {});
       log('ERROR conversation: ' + err.message, 'err-line');
       $('diagError').textContent = err.message;
+      setAppState('error', 'ERROR');
     }
   }
 
@@ -554,6 +759,7 @@
     if (extra.transcription) addTag(meta, `stt: "${extra.transcription.text}" (${extra.transcription.duration_ms}ms)`);
     if (extra.visionUsed) addTag(meta, 'vision_used');
     if (extra.visionRequested) addTag(meta, 'vision_requested');
+    if (extra.audioUnavailable) addTag(meta, '⚠ audio no disponible (fallback a texto)');
     if (meta.children.length) div.appendChild(meta);
 
     if (extra.latency) {
@@ -585,6 +791,11 @@
       audio.src = extra.audioUrl;
       audio.controls = true;
       audio.autoplay = false;
+      // Estado visible SPEAKING mientras el audio de respuesta realmente
+      // suena — no una suposición, sino los eventos reales de <audio>.
+      audio.addEventListener('play', () => setAppState('speaking', 'SPEAKING'));
+      audio.addEventListener('ended', () => { if (state.appState === 'speaking') setAppState('idle'); });
+      audio.addEventListener('pause', () => { if (state.appState === 'speaking') setAppState('idle'); });
       div.appendChild(audio);
     }
 

@@ -14,21 +14,27 @@ import { NotFoundError } from './errors.js';
  * Política de contexto (sección 15/16):
  *  - Se conserva un historial corto de turnos (texto only, sin imágenes).
  *  - Se conserva UNA "última imagen activa" (ephemeral vision) con
- *    expiración propia, más un resumen textual corto generado por el LLM
- *    ("vision_context_summary") en vez de la imagen completa.
+ *    expiración propia, más un resumen textual corto ("vision_context_summary")
+ *    guardado en el turno del propio LLM ya generado — nunca inventado ni
+ *    re-derivado con una segunda llamada. Se reemplaza cuando llega una
+ *    imagen nueva (una sola "vista activa" a la vez — sin memoria multi-imagen
+ *    real todavía; ver docs/DOOMY_VISION_ARCHITECTURE.md#limitaciones).
  *  - "remembered vision" es un flag por turno que deja preparada la
  *    interfaz `RememberedVisionStore` (ver vision-memory.js) para cuando
  *    el sistema de memoria real de Doomy la soporte. No persiste nada
  *    permanente en este backend por defecto.
  */
 
-const MAX_HISTORY_TURNS = 12;
-
 export class SessionStore {
-  constructor({ ttlMinutes = config.limits.sessionTtlMinutes, lastImageTtlMinutes = config.limits.sessionLastImageTtlMinutes } = {}) {
+  constructor({
+    ttlMinutes = config.limits.sessionTtlMinutes,
+    lastImageTtlMinutes = config.limits.sessionLastImageTtlMinutes,
+    maxHistoryTurns = config.limits.maxHistoryTurns,
+  } = {}) {
     this.sessions = new Map();
     this.ttlMs = ttlMinutes * 60 * 1000;
     this.lastImageTtlMs = lastImageTtlMinutes * 60 * 1000;
+    this.maxHistoryTurns = maxHistoryTurns;
   }
 
   create({ deviceId, deviceType = 'rayban_meta', mode = 'real' }) {
@@ -42,6 +48,7 @@ export class SessionStore {
       lastActivityAt: now,
       history: [], // [{ role, text, timestamp, visionUsed }]
       lastImage: null, // { thumbnailB64, summary, capturedAt, width, height }
+      visionContextSummary: null, // { text, capturedAt } — respuesta real del LLM, nunca inventado
       remembered: [], // interfaz preparada, no persistida fuera de este proceso
       turns: 0,
     };
@@ -65,8 +72,8 @@ export class SessionStore {
 
   addTurn(session, { role, text, visionUsed = false }) {
     session.history.push({ role, text, timestamp: Date.now(), visionUsed });
-    if (session.history.length > MAX_HISTORY_TURNS) {
-      session.history.splice(0, session.history.length - MAX_HISTORY_TURNS);
+    if (session.history.length > this.maxHistoryTurns) {
+      session.history.splice(0, session.history.length - this.maxHistoryTurns);
     }
     if (role === 'user') session.turns += 1;
     this.touch(session);
@@ -80,6 +87,17 @@ export class SessionStore {
       height,
       capturedAt: Date.now(),
     };
+    // Nueva imagen reemplaza el contexto visual activo — sin memoria
+    // multi-imagen real (documentado como limitación honesta, no simulada).
+    session.visionContextSummary = null;
+    session.lastImageBuffer = null;
+    this.touch(session);
+  }
+
+  /** Guarda el resumen textual REAL que ya devolvió el LLM para esta imagen
+   * (nunca un resumen inventado ni una segunda llamada solo para resumir). */
+  setVisionContextSummary(session, text) {
+    session.visionContextSummary = { text, capturedAt: Date.now() };
     this.touch(session);
   }
 

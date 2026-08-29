@@ -11,14 +11,18 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke": "node scripts/real-provider-smoke-test.mjs",
+    "smoke:pipeline": "node scripts/real-pipeline-smoke-test.mjs",
+    "e2e": "node tests/manual_e2e_simulator.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@anthropic-ai/sdk": "^0.122.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "express-rate-limit": "^7.4.1",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
     "pino": "^9.5.0",

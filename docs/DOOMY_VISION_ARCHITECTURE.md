@@ -140,6 +140,41 @@ create table doomy_vision_turns (
 );
 ```
 
+### 4.2.1 Memoria visual: una imagen activa, NO memoria multi-imagen (Fase 12-14, Mission 002)
+
+Verificado con pruebas reales (`tests/session_memory.test.js`), no asumido:
+
+- Mientras una imagen sigue activa (dentro de `SESSION_LAST_IMAGE_TTL_MINUTES`), los
+  follow-ups de texto reutilizan exactamente esos mismos bytes — probado espiando
+  `LLMProvider.chat()` y comparando el `imageBase64` recibido turno a turno.
+- Al llegar una imagen nueva, `SessionStore.setLastImage()` reemplaza por completo el
+  contexto visual anterior: borra `lastImageBuffer` y `visionContextSummary` antes de
+  guardar los datos de la imagen nueva. A partir de ese turno, los bytes de la imagen
+  anterior ya no existen en memoria del proceso — no hay forma de que "se cuelen".
+- **Limitación real y deliberada, no simulada**: Doomy Vision V1 **no tiene memoria
+  multi-imagen**. Una pregunta como *"¿cuál de los dos tenía más puertos?"* después de
+  reemplazar la imagen A por la B solo llega al LLM con los bytes de B — nunca con A y B
+  a la vez. El backend no inventa una respuesta comparativa; el modelo responde con lo
+  único que puede ver (la imagen activa) o, en modo real, puede admitir que no tiene forma
+  de comparar. Implementar memoria multi-imagen real requeriría decidir cuántas imágenes
+  guardar, por cuánto tiempo, y el costo/latencia de mandar varias imágenes por request —
+  una decisión de producto explícitamente fuera de alcance de esta misión.
+- `vision_context_summary` en la respuesta (`{text, capturedAt}`) es **siempre** el texto
+  que el LLM ya generó para la imagen activa, nunca un resumen inventado por separado ni
+  una segunda llamada — se reemplaza junto con la imagen.
+- **Bug real encontrado y corregido en esta misión**: la heurística de "pregunta corta de
+  seguimiento" en `src/intent.js` usaba un límite de 6 palabras; preguntas de seguimiento
+  perfectamente normales en español como la de arriba (7 palabras) caían fuera del umbral
+  y perdían la imagen activa sin motivo semántico. Detectado escribiendo la prueba de la
+  limitación honesta de arriba (el test falló primero de forma genuina), corregido subiendo
+  el límite a 12 palabras, reverificado con la suite completa.
+- **Aislamiento entre sesiones (crítico, sección 53)**: probado con dos sesiones
+  concurrentes (`Promise.all`), cada una con su propia imagen, incluyendo sus follow-ups —
+  nunca se mezcla `session_id`, imagen activa ni historial entre ellas, y los `request_id`
+  son únicos bajo concurrencia. Estructuralmente esto ya lo garantizaba `SessionStore`
+  (un `Map` por `session.id`, sin estado compartido entre sesiones), pero se verificó con
+  una prueba real en vez de asumirlo.
+
 ### 4.3 Intent de visión (`needsVision`, sección 17)
 
 `src/intent.js` clasifica cada turno en `needs_new_image | reuse_last_image | no_vision`
@@ -259,6 +294,47 @@ de grabación configurable (`max_audio_seconds`). Probado (5 tests, Android/JVM)
   video, solo un frame comprimido cuando hace falta), no hay grabación continua de audio
   (push-to-talk hace explícito cuándo se escucha), la visión solo ocurre dentro de una
   interacción iniciada por el usuario.
+
+### 5.1 Endurecimiento de seguridad (Fase 15-24, Mission 002)
+
+Verificado con pruebas reales (`tests/security.test.js`), no asumido:
+
+- **Cabeceras** (`helmet`): activas en todas las respuestas (`X-Content-Type-Options`,
+  etc.), `x-powered-by` deshabilitado. CSP desactivada a nivel global porque el propio Dev
+  Console es HTML+JS inline servido como estático — no aplica a las rutas de API (JSON puro).
+- **CORS por entorno**: `CORS_ALLOWED_ORIGINS` vacío (default) mantiene el comportamiento
+  abierto original, correcto para desarrollo/simulador interno; con una lista fijada, solo
+  esos orígenes exactos reciben la cabecera de permiso — cualquier otro origen de navegador
+  queda bloqueado. El Bridge nativo (Android/iOS) nunca manda header `Origin`, así que esta
+  política no lo afecta en ningún caso.
+- **Rate limiting diferenciado**: `/device`, `/session` y `/conversation` comparten el
+  límite general (`RATE_LIMIT_MAX_PER_MINUTE`); `/vision` y `/audio/*` (subida directa de
+  archivos pesados fuera del orquestador principal) tienen su propio límite, más estricto
+  por defecto (`RATE_LIMIT_VISION_AUDIO_MAX_PER_MINUTE`), probado como genuinamente
+  independiente del general.
+- **Comparación en tiempo constante**: `DOOMY_VISION_INTERNAL_KEY` se compara con
+  `crypto.timingSafeEqual` sobre hashes SHA-256 de longitud fija (no la clave cruda
+  directamente, para no filtrar su longitud), en vez de `!==`.
+- **Timeout de request** (`REQUEST_TIMEOUT_MS` + margen configurable): si un handler no
+  responde a tiempo, el middleware corta con `TimeoutError` (504, `DV_TIMEOUT_001`) en vez
+  de dejar la conexión colgada indefinidamente — probado end-to-end forzando un proveedor
+  mock artificialmente lento.
+- **Errores de Multer** (multipart malformado, archivo que excede el límite del propio
+  Multer) se traducen a un `ValidationError` 400/413 limpio, nunca a un 500 genérico con
+  el mensaje interno de Multer sin normalizar.
+- **`details` de error nunca llega al cliente en producción para errores 5xx** — sigue
+  disponible completo en logs del servidor. En 4xx sí se conserva (es información útil
+  para el cliente, como la lista de MIME permitidos), nunca contiene secretos.
+- **`NODE_ENV=production` + `MOCK_MODE=true` simultáneos bloquean el arranque** por
+  defecto (`assertProductionReady()`) — probable error de configuración que dejaría un
+  ambiente "de producción" respondiendo con datos de IA simulados sin que nadie lo note.
+  `ALLOW_MOCK_IN_PRODUCTION=true` es el escape hatch explícito y documentado.
+- **Liveness vs readiness separados** (`/health/live` vs `/health/ready`, sección 4.2
+  no aplica aquí — ver más abajo): liveness nunca depende de config/proveedores (para no
+  matar el proceso por un problema externo), readiness sí revisa configuración crítica.
+- **Path traversal**: la descarga de audio (`GET /audio/:id`) resuelve por UUID contra un
+  caché en memoria, nunca concatena el parámetro a una ruta de filesystem; el Dev Console
+  estático se sirve con `express.static`, que ya previene traversal por diseño.
 
 ## 6. Lo que Doomy Vision NO hace (por diseño)
 

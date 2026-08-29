@@ -42,9 +42,15 @@ export function classifyVisionIntent(text, { hasActiveImage } = {}) {
   if (VISION_TRIGGERS.some((re) => re.test(t))) {
     return hasActiveImage ? 'reuse_last_image' : 'needs_new_image';
   }
-  // Pregunta corta de seguimiento inmediatamente después de una imagen activa:
+  // Pregunta de seguimiento inmediatamente después de una imagen activa:
   // reutilizamos por defecto en vez de pedir una nueva captura innecesaria.
-  if (hasActiveImage && t.split(/\s+/).length <= 6) {
+  // Límite de palabras subido de 6 a 12 en Mission 002 (Fase 14): una
+  // prueba real detectó que preguntas de seguimiento perfectamente
+  // normales como "¿cuál de los dos tenía más puertos?" (7 palabras)
+  // caían fuera del umbral anterior y perdían la imagen activa sin razón
+  // semántica — seguía siendo una heurística simple, solo con un límite
+  // más realista para español conversacional.
+  if (hasActiveImage && t.split(/\s+/).length <= 12) {
     return 'reuse_last_image';
   }
   return 'no_vision';

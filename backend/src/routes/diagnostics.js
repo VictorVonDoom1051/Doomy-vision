@@ -24,6 +24,16 @@ diagnosticsRouter.get('/diagnostics', (_req, res) => {
       tts: config.mockMode || !config.providers.elevenlabsApiKey ? 'MOCK' : 'ELEVENLABS',
     },
     flags: config.flags,
+    // Límites operativos NO secretos — el Bridge/simulador los usa para
+    // auto-ajustar su comportamiento (p. ej. cortar la grabación de PTT
+    // antes de que el backend la rechace) sin tener que duplicar los
+    // valores por env var en el cliente. Nunca incluye secretos/keys.
+    limits: {
+      audio_max_seconds: config.limits.audioMaxSeconds,
+      audio_max_mb: config.limits.audioMaxMb,
+      vision_max_image_mb: config.limits.visionMaxImageMb,
+      rate_limit_max_per_minute: config.limits.rateLimitMaxPerMinute,
+    },
     active_sessions: sessionStore.count(),
     metrics: metrics.snapshot(),
     timestamp: new Date().toISOString(),

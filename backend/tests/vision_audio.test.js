@@ -112,6 +112,18 @@ describe('health & diagnostics', () => {
     expect(res.body.providers.llm).toBe('MOCK');
   });
 
+  it('GET /diagnostics expone límites operativos no secretos (para que el Bridge/simulador se auto-ajuste)', async () => {
+    const app = makeApp();
+    const res = await request(app).get(`${V1}/diagnostics`);
+    expect(res.status).toBe(200);
+    expect(res.body.limits).toBeTruthy();
+    expect(typeof res.body.limits.audio_max_seconds).toBe('number');
+    expect(typeof res.body.limits.audio_max_mb).toBe('number');
+    // nunca debe filtrar secretos en este payload
+    const asString = JSON.stringify(res.body);
+    expect(asString).not.toMatch(/internalKey|api_key|apiKey|jwtSecret/i);
+  });
+
   it('ruta desconocida devuelve 404 estructurado', async () => {
     const app = makeApp();
     const res = await request(app).get('/no/existe');

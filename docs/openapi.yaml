@@ -1,0 +1,617 @@
+openapi: 3.0.3
+info:
+  title: Doomy Vision API
+  description: >
+    API aislada que conecta el Bridge (Ray-Ban Meta / fallback de teléfono) con Doomy.
+    Refleja solo endpoints que existen realmente en backend/src/routes/ — no aspiracional.
+    Ver docs/DOOMY_VISION_BRIDGE_API.md para notas de uso más detalladas.
+  version: "1.0.0"
+servers:
+  - url: /api/doomy-vision/v1
+    description: Backend Doomy Vision (local, o el dominio de Railway una vez desplegado)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /device/register:
+    post:
+      summary: Registrar un device y obtener un access token de corta duración
+      security: []
+      parameters:
+        - name: x-doomy-vision-key
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Secreto compartido (DOOMY_VISION_INTERNAL_KEY)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id:
+                  type: string
+                device_type:
+                  type: string
+                  enum: [rayban_meta, mock, phone]
+      responses:
+        "200":
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceRegisterResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /session:
+    post:
+      summary: Crear una sesión
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_type:
+                  type: string
+                mode:
+                  type: string
+                  enum: [real, mock, phone]
+      responses:
+        "201":
+          description: Sesión creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /session/{id}:
+    get:
+      summary: Consultar el estado de una sesión
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Estado actual de la sesión
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /session/{id}/reset:
+    post:
+      summary: Limpiar historial, imagen activa y resumen visual de una sesión
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Sesión reseteada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /conversation:
+    post:
+      summary: Enviar un turno (texto, voz, imagen, o combinaciones) y recibir la respuesta de Doomy
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [session_id]
+              properties:
+                session_id:
+                  type: string
+                  format: uuid
+                text:
+                  type: string
+                image:
+                  type: string
+                  format: binary
+                audio:
+                  type: string
+                  format: binary
+                audio_capture_ms:
+                  type: number
+                response_mode:
+                  type: string
+                  enum: [screen, wearable]
+      responses:
+        "200":
+          description: Respuesta de Doomy para este turno
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "504":
+          $ref: "#/components/responses/Error"
+
+  /vision:
+    post:
+      summary: Subir una imagen directamente como "imagen activa" de una sesión, sin generar respuesta del LLM
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [session_id, image]
+              properties:
+                session_id:
+                  type: string
+                image:
+                  type: string
+                  format: binary
+                remember:
+                  type: string
+                  enum: ["true", "false"]
+                note:
+                  type: string
+      responses:
+        "201":
+          description: Imagen registrada como imagen activa de la sesión
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisionUploadResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /audio/transcribe:
+    post:
+      summary: Transcribir un archivo de audio directamente (sin pasar por /conversation)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio]
+              properties:
+                audio:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Transcripción
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id:
+                    type: string
+                  text:
+                    type: string
+                  duration_ms:
+                    type: number
+                  audio_bytes:
+                    type: number
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+
+  /audio/speak:
+    post:
+      summary: Generar audio TTS a partir de texto directamente (sin pasar por /conversation)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+      responses:
+        "200":
+          description: Audio generado (o note si TTS está deshabilitado)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id:
+                    type: string
+                  audio:
+                    $ref: "#/components/schemas/AudioRef"
+                  duration_ms:
+                    type: number
+                  note:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+
+  /audio/{id}:
+    get:
+      summary: Descargar un audio generado (TTL de 5 minutos)
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contenido de audio binario
+          content:
+            audio/wav: {}
+            audio/mpeg: {}
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /health:
+    get:
+      summary: Liveness (alias de /health/live, compatibilidad hacia atrás)
+      security: []
+      responses:
+        "200":
+          description: El proceso está vivo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLive"
+
+  /health/live:
+    get:
+      summary: Liveness — nunca depende de configuración ni de proveedores externos
+      security: []
+      responses:
+        "200":
+          description: El proceso está vivo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLive"
+
+  /health/ready:
+    get:
+      summary: Readiness — revisa configuración crítica de producción
+      security: []
+      responses:
+        "200":
+          description: Listo para recibir tráfico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+        "503":
+          description: No listo — ver "problems" para el detalle (nunca incluye valores de secretos)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+
+  /diagnostics:
+    get:
+      summary: Estado de proveedores, límites operativos no secretos, y métricas agregadas
+      security: []
+      responses:
+        "200":
+          description: Snapshot de diagnóstico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Diagnostics"
+        "404":
+          description: Diagnostics deshabilitado (DIAGNOSTICS_ENABLED=false)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Error:
+      description: Error estructurado (ver docs/DOOMY_VISION_BRIDGE_API.md para la tabla completa de códigos)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    DeviceRegisterResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in_min:
+          type: number
+        device_id:
+          type: string
+        device_type:
+          type: string
+
+    Session:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+        device_type:
+          type: string
+        mode:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        turns:
+          type: number
+        has_active_image:
+          type: boolean
+        active_image_summary:
+          type: string
+          nullable: true
+
+    AudioRef:
+      type: object
+      nullable: true
+      properties:
+        url:
+          type: string
+        format:
+          type: string
+        expires_in_s:
+          type: number
+
+    VisionRequired:
+      type: object
+      nullable: true
+      properties:
+        status:
+          type: string
+          example: vision_required
+        reason:
+          type: string
+
+    VisionContextSummary:
+      type: object
+      nullable: true
+      properties:
+        text:
+          type: string
+        capturedAt:
+          type: number
+
+    Transcription:
+      type: object
+      nullable: true
+      properties:
+        text:
+          type: string
+        duration_ms:
+          type: number
+
+    LatencyMs:
+      type: object
+      description: Solo aparecen las claves relevantes al turno (p. ej. sin stt_ms si no hubo audio)
+      properties:
+        upload_ms:
+          type: number
+        audio_capture_ms:
+          type: number
+          description: Client-measured, no calculado por el backend
+        stt_ms:
+          type: number
+        vision_prepare_ms:
+          type: number
+        llm_ms:
+          type: number
+        tts_ms:
+          type: number
+        total_ms:
+          type: number
+
+    ConversationResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        request_id:
+          type: string
+        response_id:
+          type: string
+          description: Igual a request_id, se conservan ambos nombres por compatibilidad
+        text:
+          type: string
+        audio:
+          $ref: "#/components/schemas/AudioRef"
+        audio_unavailable:
+          type: boolean
+          description: true si TTS falló — el turno igual se completó con texto
+        actions:
+          type: array
+          items: {}
+        vision_used:
+          type: boolean
+        vision_requested:
+          type: boolean
+        vision_required:
+          $ref: "#/components/schemas/VisionRequired"
+        vision_context_summary:
+          $ref: "#/components/schemas/VisionContextSummary"
+        response_mode:
+          type: string
+          enum: [screen, wearable]
+        transcription:
+          $ref: "#/components/schemas/Transcription"
+        remembered:
+          nullable: true
+        latency_ms:
+          $ref: "#/components/schemas/LatencyMs"
+
+    VisionUploadResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+        session_id:
+          type: string
+          format: uuid
+        image:
+          type: object
+          properties:
+            width:
+              type: number
+            height:
+              type: number
+            original_bytes:
+              type: number
+            compressed_bytes:
+              type: number
+            compression_ms:
+              type: number
+            thumbnail_base64:
+              type: string
+        remembered:
+          nullable: true
+
+    HealthLive:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+        version:
+          type: string
+        mock_mode:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    HealthReady:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        problems:
+          type: array
+          items:
+            type: string
+        mock_mode:
+          type: boolean
+        node_env:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Diagnostics:
+      type: object
+      properties:
+        doomy_core:
+          type: string
+        mock_mode:
+          type: boolean
+        providers:
+          type: object
+          properties:
+            llm:
+              type: string
+            stt:
+              type: string
+            tts:
+              type: string
+        flags:
+          type: object
+        limits:
+          type: object
+          description: Límites operativos no secretos (nunca API keys ni tokens)
+        active_sessions:
+          type: number
+        metrics:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            dv_code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true

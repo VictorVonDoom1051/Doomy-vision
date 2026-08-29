@@ -1,0 +1,30 @@
+# Doomy Vision — configuración Railway (Fase 25-30/56-59, Mission 002).
+#
+# Este archivo NO crea ni modifica ningún recurso de Railway por sí solo —
+# solo queda listo en el repo para cuando Victor decida crear el servicio
+# manualmente (ver docs/DOOMY_VISION_RAILWAY_DEPLOY.md). No se ejecutó
+# ningún `railway up` ni se tocó ningún servicio real durante esta misión.
+#
+# Builder: Nixpacks (el default de Railway para Node.js), NO Dockerfile.
+# Justificación (para no agregar Docker "porque sí"): el backend es un
+# proceso Node.js estándar sin pasos de build inusuales; su única
+# dependencia nativa (`sharp`) ya se resuelve correctamente con binarios
+# prebuilt durante un `npm install` normal bajo Nixpacks — no se necesita
+# ninguna herramienta de sistema adicional (no se usa ffmpeg ni nada por el
+# estilo). Un Dockerfile solo aportaría complejidad de mantenimiento sin
+# ningún beneficio real aquí.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "cd backend && npm ci --omit=dev"
+
+[deploy]
+startCommand = "cd backend && node src/server.js"
+# Readiness, no liveness: Railway no debe enrutar tráfico a un deploy nuevo
+# hasta que confirme que la configuración de producción es válida (ver
+# GET /health/ready en src/routes/health.js) — no solo que el proceso abrió
+# el puerto.
+healthcheckPath = "/api/doomy-vision/v1/health/ready"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

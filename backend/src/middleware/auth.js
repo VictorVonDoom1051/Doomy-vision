@@ -1,6 +1,20 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
 import { config } from './../config.js';
 import { AuthenticationError } from './../errors.js';
+
+/**
+ * Comparación en tiempo constante (Fase 15-24: "timing-safe token
+ * comparison"). `crypto.timingSafeEqual` exige buffers de igual longitud,
+ * así que primero se hashean ambos valores (SHA-256) a un tamaño fijo —
+ * esto también evita que la propia longitud del secreto se filtre por
+ * timing antes de llegar a la comparación byte a byte.
+ */
+function timingSafeStringEqual(a, b) {
+  const bufA = crypto.createHash('sha256').update(String(a ?? '')).digest();
+  const bufB = crypto.createHash('sha256').update(String(b ?? '')).digest();
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 /**
  * Autenticación (sección 27/28).
@@ -30,7 +44,7 @@ export function verifyInternalKey(req, _res, next) {
     if (config.mockMode) return next();
     return next(new AuthenticationError('DOOMY_VISION_INTERNAL_KEY no configurada en el servidor'));
   }
-  if (!provided || provided !== config.auth.internalKey) {
+  if (!provided || !timingSafeStringEqual(provided, config.auth.internalKey)) {
     return next(new AuthenticationError('Clave interna de Bridge inválida'));
   }
   next();

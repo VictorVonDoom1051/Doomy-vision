@@ -17,9 +17,13 @@
 cd doomy-vision/backend
 cp .env.example .env        # MOCK_MODE=true por default — funciona sin llaves reales
 npm install
-npm test                     # 30/30 tests, sin llamadas pagadas
+npm test                     # 60/60 tests, sin llamadas pagadas (Mission 002)
 npm run dev                  # http://localhost:8090
 ```
+
+Otros scripts: `npm run e2e` (E2E Playwright, requiere instalarlo aparte — no es
+dependencia del proyecto), `npm run smoke` / `npm run smoke:pipeline` (llamadas reales a
+proveedores, gateadas detrás de `RUN_REAL_PROVIDER_TESTS=true`, nunca en CI).
 
 Dev Console: abrir `http://localhost:8090/doomy-vision/dev/` — pegar la
 `DOOMY_VISION_INTERNAL_KEY` de tu `.env` (en `MOCK_MODE=true` cualquier valor funciona
@@ -85,23 +89,12 @@ Meta, no solo contra nuestra simulación.
 
 ## 6. Railway (cuando se autorice el deploy)
 
-No se creó ningún servicio nuevo en Railway durante esta misión (regla explícita:
-no crear servicios pagados automáticamente). Pasos para cuando Victor decida desplegar:
+No se creó ningún servicio nuevo en Railway durante ninguna misión (regla explícita: no
+crear servicios pagados automáticamente). La guía completa y actualizada, con la matriz
+de variables completa y el checklist post-deploy, vive en
+**`docs/DOOMY_VISION_RAILWAY_DEPLOY.md`** — este documento ya no la duplica para evitar
+que las dos se desincronicen. `railway.toml` (raíz del repo) ya tiene el builder
+(Nixpacks), start command y healthcheck path (`/health/ready`) listos.
 
-1. Crear un repositorio GitHub nuevo para `doomy-vision/` (o un subdirectorio dentro de
-   `doomy-assistant` en una rama `feature/doomy-vision`, si se prefiere mantenerlo en el
-   mismo repo — la carpeta ya está aislada y no interfiere).
-2. En el proyecto Railway `doomy-assistant`, crear un servicio nuevo (`doomy-vision`)
-   apuntando a ese repo/rama, `rootDirectory: /backend` si se deja en el monorepo.
-3. Configurar las variables de `backend/.env.example` en el servicio (reusando los
-   valores de `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `ELEVENLABS_API_KEY`,
-   `ELEVENLABS_VOICE_ID` ya existentes en `doomy-assistant` — no se necesitan llaves
-   nuevas).
-4. Generar `DOOMY_VISION_INTERNAL_KEY` y `DOOMY_VISION_JWT_SECRET` nuevos
-   (`openssl rand -hex 32`), exclusivos de este servicio.
-5. `DOOMY_VISION_MOCK_MODE=false`.
-6. Desplegar. `GET /api/doomy-vision/v1/health` debe responder `{"status":"ok"}`.
-
-**Nada de esto se ejecutó** en esta sesión — es la checklist lista para cuando Victor
-decida avanzar (no requiere ninguna credencial que no exista ya en Railway, salvo las dos
-que se generan localmente en el paso 4).
+`DOOMY_VISION_PRODUCTION_CHECKLIST.md` (raíz del repo) es el checklist mecánico previo al
+lanzamiento.
