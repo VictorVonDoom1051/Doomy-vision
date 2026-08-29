@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Bluetooth para HFP (mic/bocinas Ray-Ban) — sección 9 -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Fallback MODE C (cámara del teléfono) — sección 6 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <application
+        android:name=".DoomyVisionApp"
+        android:allowBackup="false"
+        android:label="Doomy Vision"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.DoomyVision"
+        android:usesCleartextTraffic="false">
+
+        <!--
+          APPLICATION_ID de Meta Wearables DAT — requerido por el SDK real
+          para identificar la app ante Meta AI durante el flujo de
+          registro (sección "Registration" del Integration Overview).
+          BLOQUEADO: se obtiene solo tras aprobación en el Developer
+          Preview de Meta. Ver DOOMY_VISION_BLOCKERS.md.
+        -->
+        <meta-data
+            android:name="com.meta.wearable.mwdat.APPLICATION_ID"
+            android:value="@string/mwdat_application_id_placeholder" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

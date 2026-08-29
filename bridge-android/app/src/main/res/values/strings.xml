@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Doomy Vision</string>
+    <!-- Placeholder — reemplazar con el APPLICATION_ID real emitido por
+         Meta tras la aprobación del Developer Preview. NUNCA commitear
+         el valor real directamente; usar un buildConfigField desde
+         local.properties / variables de entorno de CI. -->
+    <string name="mwdat_application_id_placeholder">PENDING_META_DEVELOPER_PREVIEW_APPROVAL</string>
+</resources>

@@ -1,0 +1,7 @@
+.env
+node_modules/
+build/
+.gradle/
+*.class
+.DS_Store
+*.log

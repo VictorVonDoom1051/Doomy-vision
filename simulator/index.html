@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Doomy Vision — Dev Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2335d68a'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='15' font-weight='700' text-anchor='middle' fill='%2306120c'%3EDV%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0c1210;
+    --bg-panel: #121a17;
+    --bg-panel-raised: #17211d;
+    --border: #223028;
+    --border-soft: #1a2521;
+    --text: #e8f0ec;
+    --text-dim: #8fa39a;
+    --text-faint: #5c6d65;
+    --accent: #35d68a;
+    --accent-dim: #1f7a52;
+    --accent-wash: rgba(53,214,138,.12);
+    --warn: #e0a637;
+    --warn-wash: rgba(224,166,55,.12);
+    --err: #e05656;
+    --err-wash: rgba(224,86,86,.12);
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    --display: 'Space Grotesk', Inter, system-ui, sans-serif;
+    --body: 'Inter', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(53,214,138,.05), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--body);
+    line-height:1.5;
+    min-height:100vh;
+  }
+  a{color:var(--accent);}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
+
+  header.top{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding-bottom:20px;border-bottom:1px solid var(--border-soft);margin-bottom:24px;
+    flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-dim));
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--display);font-weight:700;color:#06120c;font-size:16px;
+    box-shadow:0 0 0 1px rgba(53,214,138,.3), 0 8px 24px -8px rgba(53,214,138,.5);
+  }
+  .brand-text h1{font-family:var(--display);font-size:19px;font-weight:600;margin:0;letter-spacing:.01em;}
+  .brand-text p{margin:2px 0 0;font-size:12.5px;color:var(--text-dim);}
+  .env-badge{
+    font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--warn);background:var(--warn-wash);border:1px solid rgba(224,166,55,.35);
+    padding:5px 10px;border-radius:6px;white-space:nowrap;
+  }
+
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;}
+  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px 18px 20px;
+  }
+  .panel + .panel{margin-top:16px;}
+  .panel h2{
+    font-family:var(--display);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--text-dim);margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;
+  }
+
+  label{display:block;font-size:12.5px;color:var(--text-dim);margin:0 0 6px;}
+  input[type=text],input[type=url],select,textarea{
+    width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+    color:var(--text);padding:9px 10px;font-family:var(--body);font-size:13.5px;
+    outline:none;transition:border-color .15s;
+  }
+  textarea{resize:vertical;min-height:64px;font-family:var(--body);}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent-dim);}
+  .field{margin-bottom:12px;}
+  .row{display:flex;gap:10px;}
+  .row > *{flex:1;}
+
+  button{
+    font-family:var(--body);font-weight:600;font-size:13.5px;cursor:pointer;
+    border-radius:7px;border:1px solid var(--border);background:var(--bg-panel-raised);
+    color:var(--text);padding:9px 14px;transition:.15s border-color,.15s background;
+  }
+  button:hover{border-color:var(--accent-dim);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.primary{background:var(--accent);color:#06140d;border-color:var(--accent);}
+  button.primary:hover{background:#3fe698;}
+  button.danger{border-color:rgba(224,86,86,.4);color:#f2a3a3;}
+  button.ghost{background:transparent;}
+  button.small{padding:5px 10px;font-size:12px;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;
+    padding:3px 9px;border-radius:100px;border:1px solid var(--border);color:var(--text-dim);
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);flex:none;}
+  .pill.ok .dot{background:var(--accent);box-shadow:0 0 8px var(--accent);}
+  .pill.ok{color:var(--accent);border-color:rgba(53,214,138,.35);background:var(--accent-wash);}
+  .pill.warn .dot{background:var(--warn);}
+  .pill.warn{color:var(--warn);border-color:rgba(224,166,55,.35);background:var(--warn-wash);}
+  .pill.err .dot{background:var(--err);}
+  .pill.err{color:#f2a3a3;border-color:rgba(224,86,86,.35);background:var(--err-wash);}
+
+  .diag-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;}
+  .diag-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--border-soft);}
+  .diag-row:last-child{border-bottom:none;}
+  .diag-row span.k{color:var(--text-dim);}
+
+  .state-strip{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+
+  .chat{display:flex;flex-direction:column;gap:12px;min-height:120px;}
+  .msg{max-width:78%;padding:11px 13px;border-radius:11px;font-size:14px;line-height:1.5;}
+  .msg.user{align-self:flex-end;background:var(--accent-wash);border:1px solid rgba(53,214,138,.25);}
+  .msg.assistant{align-self:flex-start;background:var(--bg-panel-raised);border:1px solid var(--border);}
+  .msg .meta{display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;}
+  .msg .meta .tag{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);border:1px solid var(--border-soft);padding:2px 6px;border-radius:5px;}
+  .msg img.thumb{max-width:180px;border-radius:8px;display:block;margin-top:8px;border:1px solid var(--border);}
+  .msg audio{margin-top:8px;width:220px;height:32px;}
+  .empty-hint{color:var(--text-faint);font-size:13px;padding:30px 8px;text-align:center;border:1px dashed var(--border);border-radius:10px;}
+
+  .composer{border-top:1px solid var(--border-soft);margin-top:16px;padding-top:14px;}
+  .capture-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .preview-strip{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;}
+  .preview-chip{
+    display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);
+    border-radius:8px;padding:5px 8px 5px 5px;font-size:12px;color:var(--text-dim);
+  }
+  .preview-chip img{width:28px;height:28px;border-radius:5px;object-fit:cover;}
+  .preview-chip button{padding:2px 6px;font-size:11px;}
+  video#webcamPreview{width:100%;max-width:280px;border-radius:8px;border:1px solid var(--border);display:none;background:#000;}
+  canvas{display:none;}
+
+  .send-row{display:flex;gap:8px;align-items:flex-end;}
+  .send-row textarea{flex:1;}
+
+  .lat-bar{display:flex;height:6px;border-radius:4px;overflow:hidden;margin-top:6px;background:var(--bg);}
+  .lat-seg{height:100%;}
+  .lat-seg.stt{background:#4fa8e0;}
+  .lat-seg.vision{background:#c07be0;}
+  .lat-seg.llm{background:var(--accent);}
+  .lat-seg.tts{background:var(--warn);}
+  .lat-legend{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;}
+  .lat-legend span{font-family:var(--mono);font-size:10.5px;color:var(--text-dim);display:flex;align-items:center;gap:5px;}
+  .lat-legend i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+
+  .log{
+    font-family:var(--mono);font-size:11.5px;color:var(--text-dim);background:var(--bg);
+    border:1px solid var(--border-soft);border-radius:8px;padding:10px;max-height:170px;overflow:auto;
+    white-space:pre-wrap;
+  }
+  .log .err-line{color:#f2a3a3;}
+  .log .ok-line{color:var(--accent);}
+
+  footer{margin-top:28px;color:var(--text-faint);font-size:11.5px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">DV</div>
+      <div class="brand-text">
+        <h1>Doomy Vision</h1>
+        <p>Developer Console — prueba el backend sin lentes ni app móvil</p>
+      </div>
+    </div>
+    <div class="env-badge">⚠ development / internal tool</div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: connection + session + diagnostics -->
+    <div>
+      <div class="panel">
+        <h2>Conexión</h2>
+        <div class="field">
+          <label for="apiBase">API base</label>
+          <input type="url" id="apiBase" value="" />
+        </div>
+        <div class="field">
+          <label for="internalKey">Internal key (Bridge secret, solo dev)</label>
+          <input type="text" id="internalKey" placeholder="DOOMY_VISION_INTERNAL_KEY" />
+        </div>
+        <div class="field">
+          <label for="deviceId">Device ID</label>
+          <input type="text" id="deviceId" value="dev-console-01" />
+        </div>
+        <div class="field">
+          <label for="modeSelect">Modo simulado de dispositivo</label>
+          <select id="modeSelect">
+            <option value="mock">MODE B — Meta Mock Device</option>
+            <option value="phone" selected>MODE C — Phone Fallback (este navegador)</option>
+            <option value="real">MODE A — Ray-Ban reales (no disponible aquí)</option>
+          </select>
+        </div>
+        <div class="btn-row">
+          <button class="primary" id="btnConnect">Registrar + crear sesión</button>
+          <button class="ghost small" id="btnReset">Reset session</button>
+        </div>
+        <div class="state-strip" id="stateStrip" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Diagnostics <button class="ghost small" id="btnRefreshDiag">↻</button></h2>
+        <div class="diag-grid" id="diagGrid">
+          <div class="diag-row"><span class="k">Doomy Core</span><span class="pill" id="diagCore">—</span></div>
+          <div class="diag-row"><span class="k">Ray-Ban</span><span class="pill" id="diagGlasses">—</span></div>
+          <div class="diag-row"><span class="k">Cámara</span><span class="pill" id="diagCamera">—</span></div>
+          <div class="diag-row"><span class="k">Audio in</span><span class="pill" id="diagAudioIn">—</span></div>
+          <div class="diag-row"><span class="k">Audio out</span><span class="pill" id="diagAudioOut">—</span></div>
+          <div class="diag-row"><span class="k">Red</span><span class="pill" id="diagNet">—</span></div>
+        </div>
+        <div class="diag-grid" style="margin-top:12px;">
+          <div class="diag-row"><span class="k">session_id</span><span id="diagSession" style="font-family:var(--mono);font-size:11px;">—</span></div>
+          <div class="diag-row"><span class="k">last latency</span><span id="diagLatency" style="font-family:var(--mono);font-size:11px;">—</span></div>
+          <div class="diag-row"><span class="k">success rate</span><span id="diagSuccess" style="font-family:var(--mono);font-size:11px;">—</span></div>
+          <div class="diag-row"><span class="k">last error</span><span id="diagError" style="font-family:var(--mono);font-size:11px;">—</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Log</h2>
+        <div class="log" id="log">// esperando conexión…</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: conversation -->
+    <div class="panel">
+      <h2>Conversación</h2>
+      <div class="chat" id="chat">
+        <div class="empty-hint">Registra un dispositivo y crea una sesión para empezar.<br/>Prueba: "¿Qué estoy viendo?" con una imagen adjunta, luego "¿Tiene PoE?" sin imagen.</div>
+      </div>
+
+      <div class="composer">
+        <div class="capture-row">
+          <button class="small" id="btnAttachImage">📎 Adjuntar imagen</button>
+          <button class="small" id="btnWebcam">🎥 Cámara web (frame)</button>
+          <button class="small" id="btnMic">🎙️ Grabar (mantener)</button>
+          <span class="pill" id="micState"><span class="dot"></span>IDLE</span>
+        </div>
+        <input type="file" id="fileImage" accept="image/*" style="display:none" />
+        <video id="webcamPreview" autoplay playsinline muted></video>
+        <canvas id="snapCanvas"></canvas>
+        <div class="preview-strip" id="previewStrip"></div>
+
+        <div class="send-row">
+          <textarea id="textInput" placeholder="Escribe como si hablaras por los Ray-Ban… (Doomy, ¿qué estoy viendo?)"></textarea>
+          <button class="primary" id="btnSend">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Doomy Vision Dev Console — herramienta interna, no expone llaves de IA al cliente. Todas las llamadas de IA pasan por este backend.</footer>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    apiBase: '',
+    token: null,
+    sessionId: null,
+    pendingImageBlob: null,
+    pendingAudioBlob: null,
+    mediaRecorder: null,
+    recordedChunks: [],
+    stream: null,
+    webcamStream: null,
+  };
+
+  // Default API base = same origin the console is served from.
+  $('apiBase').value = window.location.origin;
+
+  function log(msg, cls) {
+    const el = $('log');
+    const line = document.createElement('div');
+    if (cls) line.className = cls;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function setPill(id, level, text) {
+    const el = $(id);
+    el.className = 'pill' + (level ? ' ' + level : '');
+    el.innerHTML = `<span class="dot"></span>${text}`;
+  }
+
+  function v1(path) {
+    return state.apiBase.replace(/\/$/, '') + '/api/doomy-vision/v1' + path;
+  }
+
+  async function apiFetch(path, opts = {}) {
+    const headers = opts.headers || {};
+    if (state.token) headers['authorization'] = 'Bearer ' + state.token;
+    const res = await fetch(v1(path), { ...opts, headers });
+    let body = null;
+    try { body = await res.json(); } catch { /* non-json (audio) */ }
+    if (!res.ok) {
+      const msg = body?.error?.message || res.statusText;
+      throw new Error(`${res.status} ${msg}`);
+    }
+    return body;
+  }
+
+  // ---------- Connect / session ----------
+  $('btnConnect').addEventListener('click', async () => {
+    state.apiBase = $('apiBase').value.trim();
+    const key = $('internalKey').value.trim();
+    const deviceId = $('deviceId').value.trim() || 'dev-console';
+    try {
+      log('Registrando device…');
+      const reg = await apiFetch('/device/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-doomy-vision-key': key },
+        body: JSON.stringify({ device_id: deviceId, device_type: 'phone' }),
+      });
+      state.token = reg.access_token;
+      log('Device registrado. Token obtenido.', 'ok-line');
+
+      const mode = $('modeSelect').value;
+      const sess = await apiFetch('/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ device_type: reg.device_type, mode }),
+      });
+      state.sessionId = sess.session_id;
+      $('diagSession').textContent = sess.session_id;
+      log(`Sesión creada: ${sess.session_id}`, 'ok-line');
+      renderStateStrip(mode);
+      $('chat').innerHTML = '';
+      await refreshDiagnostics();
+    } catch (err) {
+      log('ERROR: ' + err.message, 'err-line');
+      $('diagError').textContent = err.message;
+    }
+  });
+
+  $('btnReset').addEventListener('click', async () => {
+    if (!state.sessionId) return;
+    try {
+      await apiFetch(`/session/${state.sessionId}/reset`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+      $('chat').innerHTML = '';
+      log('Sesión reseteada (historial + última imagen).', 'ok-line');
+    } catch (err) {
+      log('ERROR reset: ' + err.message, 'err-line');
+    }
+  });
+
+  function renderStateStrip(mode) {
+    const strip = $('stateStrip');
+    strip.innerHTML = '';
+    const labelMap = { mock: 'MODE B · Mock Device', phone: 'MODE C · Phone Fallback', real: 'MODE A · Ray-Ban' };
+    const pill = document.createElement('span');
+    pill.className = 'pill ok';
+    pill.innerHTML = `<span class="dot"></span>${labelMap[mode] || mode}`;
+    strip.appendChild(pill);
+
+    setPill('diagGlasses', mode === 'real' ? 'warn' : 'ok', mode === 'real' ? 'NOT VERIFIED' : 'SIMULATED');
+    setPill('diagCamera', 'ok', mode === 'phone' ? 'PHONE' : 'MOCK');
+    setPill('diagAudioIn', 'ok', mode === 'phone' ? 'PHONE MIC' : 'MOCK MIC');
+    setPill('diagAudioOut', 'ok', mode === 'phone' ? 'PHONE SPEAKER' : 'MOCK SPEAKER');
+  }
+
+  async function refreshDiagnostics() {
+    try {
+      const diag = await apiFetch('/diagnostics');
+      setPill('diagCore', 'ok', diag.mock_mode ? 'ONLINE (MOCK)' : 'ONLINE');
+      setPill('diagNet', 'ok', 'ONLINE');
+      $('diagLatency').textContent = diag.metrics.average_latency_ms != null ? diag.metrics.average_latency_ms + ' ms' : '—';
+      $('diagSuccess').textContent = diag.metrics.success_rate != null ? Math.round(diag.metrics.success_rate * 100) + '%' : '—';
+    } catch (err) {
+      setPill('diagCore', 'err', 'OFFLINE');
+      setPill('diagNet', 'err', 'ERROR');
+      $('diagError').textContent = err.message;
+    }
+  }
+  $('btnRefreshDiag').addEventListener('click', refreshDiagnostics);
+  setInterval(refreshDiagnostics, 15000);
+
+  // ---------- Attachments: file image ----------
+  $('btnAttachImage').addEventListener('click', () => $('fileImage').click());
+  $('fileImage').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    state.pendingImageBlob = file;
+    renderPreviewChip('image', file);
+  });
+
+  // ---------- Webcam capture ----------
+  $('btnWebcam').addEventListener('click', async () => {
+    const video = $('webcamPreview');
+    if (!state.webcamStream) {
+      try {
+        state.webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = state.webcamStream;
+        video.style.display = 'block';
+        $('btnWebcam').textContent = '📸 Capturar frame';
+        log('Cámara web activa.', 'ok-line');
+      } catch (err) {
+        log('No se pudo acceder a la cámara: ' + err.message, 'err-line');
+      }
+      return;
+    }
+    const canvas = $('snapCanvas');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      state.pendingImageBlob = blob;
+      renderPreviewChip('image', blob);
+      log('Frame capturado desde cámara web.', 'ok-line');
+    }, 'image/jpeg', 0.85);
+    state.webcamStream.getTracks().forEach((t) => t.stop());
+    state.webcamStream = null;
+    video.style.display = 'none';
+    $('btnWebcam').textContent = '🎥 Cámara web (frame)';
+  });
+
+  // ---------- Push-to-talk mic ----------
+  const micBtn = $('btnMic');
+  async function startRecording() {
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.recordedChunks = [];
+      state.mediaRecorder = new MediaRecorder(state.stream);
+      state.mediaRecorder.ondataavailable = (e) => e.data.size && state.recordedChunks.push(e.data);
+      state.mediaRecorder.start();
+      setPill('micState', 'ok', 'LISTENING');
+      log('🎙️ Escuchando…');
+    } catch (err) {
+      log('No se pudo acceder al micrófono: ' + err.message, 'err-line');
+    }
+  }
+  function stopRecording() {
+    if (!state.mediaRecorder) return;
+    state.mediaRecorder.onstop = () => {
+      const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
+      state.pendingAudioBlob = blob;
+      renderPreviewChip('audio', blob);
+      setPill('micState', null, 'IDLE');
+      state.stream.getTracks().forEach((t) => t.stop());
+      log('Grabación lista (' + Math.round(blob.size / 1024) + ' KB).', 'ok-line');
+    };
+    state.mediaRecorder.stop();
+  }
+  micBtn.addEventListener('mousedown', startRecording);
+  micBtn.addEventListener('mouseup', stopRecording);
+  micBtn.addEventListener('mouseleave', () => { if (state.mediaRecorder?.state === 'recording') stopRecording(); });
+  micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+  micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+  function renderPreviewChip(kind, blob) {
+    const strip = $('previewStrip');
+    strip.innerHTML = '';
+    const chip = document.createElement('div');
+    chip.className = 'preview-chip';
+    if (kind === 'image') {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(blob);
+      chip.appendChild(img);
+      chip.appendChild(document.createTextNode('imagen adjunta'));
+    } else {
+      chip.appendChild(document.createTextNode('🎙️ audio adjunto (' + Math.round(blob.size / 1024) + ' KB)'));
+    }
+    const rm = document.createElement('button');
+    rm.textContent = '✕'; rm.className = 'small';
+    rm.onclick = () => { if (kind === 'image') state.pendingImageBlob = null; else state.pendingAudioBlob = null; strip.innerHTML = ''; };
+    chip.appendChild(rm);
+    strip.appendChild(chip);
+  }
+
+  // ---------- Send ----------
+  $('btnSend').addEventListener('click', sendTurn);
+  $('textInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTurn(); }
+  });
+
+  async function sendTurn() {
+    if (!state.sessionId) { log('Crea una sesión primero.', 'err-line'); return; }
+    const text = $('textInput').value.trim();
+    if (!text && !state.pendingAudioBlob) { log('Escribe algo o graba audio.', 'err-line'); return; }
+
+    const fd = new FormData();
+    fd.append('session_id', state.sessionId);
+    if (text) fd.append('text', text);
+    if (state.pendingImageBlob) fd.append('image', state.pendingImageBlob, 'frame.jpg');
+    if (state.pendingAudioBlob) fd.append('audio', state.pendingAudioBlob, 'ptt.webm');
+
+    appendMsg('user', text || '(audio)', { thumb: state.pendingImageBlob });
+    $('textInput').value = '';
+    const imageWasAttached = !!state.pendingImageBlob;
+    state.pendingImageBlob = null;
+    state.pendingAudioBlob = null;
+    $('previewStrip').innerHTML = '';
+
+    const thinking = appendMsg('assistant', '🧠 Pensando…', {}, true);
+    try {
+      const res = await apiFetch('/conversation', { method: 'POST', body: fd });
+      thinking.remove();
+      let audioUrl = null;
+      if (res.audio?.url) audioUrl = state.apiBase.replace(/\/$/, '') + res.audio.url;
+      appendMsg('assistant', res.text, {
+        visionUsed: res.vision_used,
+        visionRequested: res.vision_requested,
+        transcription: res.transcription,
+        latency: res.latency_ms,
+        audioUrl,
+      });
+      if (res.vision_requested) {
+        log('Doomy pidió visión y no había imagen — vuelve a intentar adjuntando una imagen.', 'err-line');
+      }
+      $('diagLatency').textContent = (res.latency_ms.total_ms ?? '—') + ' ms';
+      log(`Respuesta recibida (${res.latency_ms.total_ms} ms, vision_used=${res.vision_used}).`, 'ok-line');
+      refreshDiagnostics();
+    } catch (err) {
+      thinking.remove();
+      appendMsg('assistant', '⚠️ ' + err.message, {});
+      log('ERROR conversation: ' + err.message, 'err-line');
+      $('diagError').textContent = err.message;
+    }
+  }
+
+  function appendMsg(role, text, extra = {}, transient = false) {
+    const chat = $('chat');
+    if (chat.querySelector('.empty-hint')) chat.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.textContent = text;
+
+    if (extra.thumb) {
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.src = URL.createObjectURL(extra.thumb);
+      div.appendChild(img);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    if (extra.transcription) addTag(meta, `stt: "${extra.transcription.text}" (${extra.transcription.duration_ms}ms)`);
+    if (extra.visionUsed) addTag(meta, 'vision_used');
+    if (extra.visionRequested) addTag(meta, 'vision_requested');
+    if (meta.children.length) div.appendChild(meta);
+
+    if (extra.latency) {
+      const bar = document.createElement('div');
+      bar.className = 'lat-bar';
+      const total = extra.latency.total_ms || 1;
+      ['stt', 'vision', 'llm', 'tts'].forEach((k) => {
+        const ms = extra.latency[k + '_ms'];
+        if (!ms) return;
+        const seg = document.createElement('div');
+        seg.className = 'lat-seg ' + k;
+        seg.style.width = Math.max(2, (ms / total) * 100) + '%';
+        bar.appendChild(seg);
+      });
+      div.appendChild(bar);
+      const legend = document.createElement('div');
+      legend.className = 'lat-legend';
+      ['stt', 'vision', 'llm', 'tts'].forEach((k) => {
+        const ms = extra.latency[k + '_ms'];
+        if (!ms) return;
+        legend.innerHTML += `<span><i style="background:var(--lat-${k},#888)" class="lat-seg ${k}" style="width:8px;height:8px;"></i>${k}: ${ms}ms</span>`;
+      });
+      legend.innerHTML += `<span>total: ${total}ms</span>`;
+      div.appendChild(legend);
+    }
+
+    if (extra.audioUrl) {
+      const audio = document.createElement('audio');
+      audio.src = extra.audioUrl;
+      audio.controls = true;
+      audio.autoplay = false;
+      div.appendChild(audio);
+    }
+
+    chat.appendChild(div);
+    chat.parentElement.scrollTop = chat.parentElement.scrollHeight;
+    return div;
+  }
+
+  function addTag(container, text) {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = text;
+    container.appendChild(tag);
+  }
+
+  log('Dev console lista. Configura la API base y la internal key para conectar.');
+})();
+</script>
+</body>
+</html>
