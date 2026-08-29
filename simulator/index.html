@@ -500,19 +500,38 @@
         state.webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = state.webcamStream;
         video.style.display = 'block';
-        $('btnWebcam').textContent = '🎥 Detener cámara';
-        log('Cámara web activa. Ahora puedes escribir "¿Qué estoy viendo?" para auto-capturar.', 'ok-line');
+        $('btnWebcam').textContent = '📸 Capturar frame';
+        log('Cámara web activa (stream en vivo). Puedes: 1) Clic para capturar manual, 2) Escribir "¿Qué estoy viendo?" para auto-capturar. El stream se mantiene activo.', 'ok-line');
       } catch (err) {
         log('No se pudo acceder a la cámara: ' + err.message, 'err-line');
       }
       return;
     }
-    // Si hay stream, detener (segundo clic)
-    state.webcamStream.getTracks().forEach((t) => t.stop());
-    state.webcamStream = null;
-    video.style.display = 'none';
-    $('btnWebcam').textContent = '🎥 Cámara web (frame)';
-    log('Cámara web detenida.', 'ok-line');
+
+    // Si hay stream, capturar frame (pero NO detener stream - se mantiene activo para más capturas)
+    const canvas = $('snapCanvas');
+    if (!video.videoWidth || !video.videoHeight) {
+      log('Captura: video aún no tiene dimensiones. Esperando...', 'warn-line');
+      setTimeout(() => $('btnWebcam').click(), 100);
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    try {
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob && blob.size > 0) {
+          state.pendingImageBlob = blob;
+          renderPreviewChip('image', blob);
+          log('Frame capturado manualmente (' + video.videoWidth + 'x' + video.videoHeight + ', ' + blob.size + ' bytes).', 'ok-line');
+        } else {
+          log('Captura: blob vacío', 'err-line');
+        }
+      }, 'image/jpeg', 0.85);
+    } catch (err) {
+      log('Captura ERROR: ' + (err?.message || String(err)), 'err-line');
+    }
   });
 
   // ---------- Push-to-talk mic (Fase 7-10: PTT real, robusto en móvil) ----------
