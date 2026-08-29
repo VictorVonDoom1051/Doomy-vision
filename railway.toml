@@ -15,15 +15,10 @@
 # ningún beneficio real aquí.
 
 [build]
-builder = "NIXPACKS"
 buildCommand = "cd backend && npm ci --omit=dev"
 
 [deploy]
 startCommand = "cd backend && node src/server.js"
-# Readiness, no liveness: Railway no debe enrutar tráfico a un deploy nuevo
-# hasta que confirme que la configuración de producción es válida (ver
-# GET /health/ready en src/routes/health.js) — no solo que el proceso abrió
-# el puerto.
 healthcheckPath = "/api/doomy-vision/v1/health/ready"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
